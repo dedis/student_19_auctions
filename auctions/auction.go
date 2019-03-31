@@ -15,6 +15,7 @@ var ContractAuctionID = "auction"
 type contractAuction struct {
 	byzcoin.BasicContract
 	AuctionData
+	s *byzcoin.Service
 }
 
 func contractAuctionFromBytes(in []byte) (byzcoin.Contract, error) {
@@ -82,69 +83,97 @@ func (c *contractAuction) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Inst
 //  - close: ends an auction
 // You can only delete a contractAuction instance after the auction is closed.
 
-//func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruction, coins []byzcoin.Coin) (sc []byzcoin.StateChange, cout []byzcoin.Coin, err error) {
-//
-//	cout = coins
-//
-//	var darcID darc.ID
-//	_, _, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
-//	if err != nil {
-//		return
-//	}
-//
-//	if inst.Invoke.Command != "close" {
-//		bidBuf := inst.Invoke.Args.Search("bid")
-//		if bidBuf == nil {
-//			err = errors.New("Error: need an argument with name bid")
-//			return
-//		}
-//	}
-//
-//	auctData := &c.AuctionData
-//	var winner BidData
-//
-//	if auctData.State == "closed" {
-//		err = errors.New("Error: auction is closed")
-//		return
-//	}
-//	// Invoke provides two methods "bid" or "close"
-//	switch inst.Invoke.Command {
-//	case "bid":
-//		if auctData.State == "open" {
-//			log.Lvl2("New bid")
-//			// Check if bidders has enough coins
-//			test = bidBuf.BidderAccount.SafeSub(bidBuf.Bid)
-//			if test != nil {
-//				log.Lvl2("Bid not accepted. Not enough coins")
-//				return
-//			}
-//			//Problem
-//			auctData.Bids = append(auctData.Bids, bidBuf)
-//			return
-//		} else {
-//			err = errors.New("Error: auction is not open")
-//		}
-//	case "close":
-//		log.Lvl2("closing")
-//		auctData.Status = "closed"
-//		winner = getWinner(auctData.Bids)
-//		//Transferring the coins from winner to seller
-// trqnsfering coins is implemented in coins.go, but you need to
-// cqll into that by using GetContrqctConstructor to make a contract factory
-// then call it with the current value of the target account, which you get with GetValue.
-// example of the difficulty/solution of how to call GetContractConstructor in insecure_darc.go
-//		test = auctData.SellerAccount.SafeAdd(winner.Deposit)
-//		if test != nil {
-//			return
-//		}
-//
-//	default:
-//		err = errors.New("Auction contract can only bid or close")
-//		return
-//	}
-//
-//	return
-//}
+func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruction, coins []byzcoin.Coin) (sc []byzcoin.StateChange, cout []byzcoin.Coin, err error) {
+
+	cout = coins
+
+	var darcID darc.ID
+	_, _, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
+	if err != nil {
+		return
+	}
+
+	/*var ContractCoinID = "contracts"                                //"coins"
+	accFactory, found := c.s.GetContractConstructor(ContractAuctionID) //-> I think only work with DARC Contracts
+	if !found {
+		return
+	}*/
+
+	if inst.Invoke.Command != "close" {
+		bidBuf := inst.Invoke.Args.Search("bid")
+		if bidBuf == nil {
+			err = errors.New("Error: need an argument with name bid")
+			return
+		}
+	}
+
+	var auctionBuf []byte
+	auctionBuf, _, _, _, err = rst.GetValues(inst.InstanceID.Slice())
+	auction := AuctionData{}
+	err = protobuf.Decode(auctionBuf, &auction)
+	if err != nil {
+		return
+	}
+
+	//Fill BidData structure
+	//Put the data from the inst.Spawn.Args into our BidData structure.
+	//bidBuf store the value of the argument with name bid
+	bidBuf := inst.Invoke.Args.Search("bid")
+	if bidBuf == nil {
+		return nil, nil, errors.New("need an argument with name bid")
+	}
+
+	//Verify that it's a bid
+	bid := BidData{}
+	err = protobuf.Decode(bidBuf, &bid)
+	if err != nil {
+		return nil, nil, errors.New("Error: not a bid")
+	}
+
+	//fmt.Println(auction)
+	//fmt.Println(bid)
+	//var winner BidData
+
+	if auction.State == "closed" {
+		err = errors.New("Error: auction is closed")
+		return
+	}
+
+	//// Invoke provides two methods "bid" or "close"
+	switch inst.Invoke.Command {
+	case "bid":
+		if auction.State == "open" {
+
+			auction.Bids = append(auction.Bids, bid)
+			print(auction.Bids)
+
+			var auctionBuf []byte
+			auctionBuf, err = protobuf.Encode(&auction)
+			if err != nil {
+				return
+			}
+
+			sc = []byzcoin.StateChange{
+				byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+					ContractAuctionID, auctionBuf, darcID),
+			}
+		}
+	//case "close":
+	//	log.Lvl2("closing")
+	//	auctData.State = "closed"
+	//	winner = getWinner(auctData.Bids)
+	//	//Transferring the coins from winner to seller
+	//	//trqnsfering coins is implemented in coins.go, but you need to
+	//	//cqll into that by using GetContrqctConstructor to make a contract factory
+	//	//then call it with the current value of the target account, which you get with GetValue.
+	//	//example of the difficulty/solution of how to call GetContractConstructor in insecure_darc.go
+	//
+	default:
+		err = errors.New("Auction contract can only bid or close")
+	}
+
+	return
+}
 
 //function getWinner
 func getWinner(bids []BidData) BidData {
