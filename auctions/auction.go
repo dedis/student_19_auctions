@@ -1,7 +1,10 @@
 package auctions
 
 import (
+	"encoding/binary"
 	"errors"
+
+	"go.dedis.ch/onet/v3/log"
 
 	"go.dedis.ch/cothority/v3/byzcoin"
 	"go.dedis.ch/cothority/v3/darc"
@@ -11,7 +14,6 @@ import (
 // ContractAuctionID identifies an auction contract
 var ContractAuctionID = "auction"
 
-// ContractAuction
 type contractAuction struct {
 	byzcoin.BasicContract
 	AuctionData
@@ -38,7 +40,7 @@ func (c *contractAuction) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Inst
 	var darcID darc.ID
 	_, _, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
 	//Verify contractAuctionID
@@ -65,9 +67,9 @@ func (c *contractAuction) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Inst
 	// InstanceID is given by the DeriveID method of the instruction that allows
 	// to create multiple instanceIDs out of a given instruction in a pseudo-
 	// random way that will be the same for all nodes.
-	instID := inst.DeriveID("")
+	auctInstID := inst.DeriveID("")
 	sc = []byzcoin.StateChange{
-		byzcoin.NewStateChange(byzcoin.Create, instID, ContractAuctionID, auctionBuf, darcID),
+		byzcoin.NewStateChange(byzcoin.Create, auctInstID, ContractAuctionID, auctionBuf, darcID),
 	}
 	return
 }
@@ -92,12 +94,6 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 	if err != nil {
 		return
 	}
-
-	/*var ContractCoinID = "contracts"                                //"coins"
-	accFactory, found := c.s.GetContractConstructor(ContractAuctionID) //-> I think only work with DARC Contracts
-	if !found {
-		return
-	}*/
 
 	if inst.Invoke.Command != "close" {
 		bidBuf := inst.Invoke.Args.Search("bid")
@@ -130,11 +126,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		return nil, nil, errors.New("Error: not a bid")
 	}
 
-	//fmt.Println(auction)
-	//fmt.Println(bid)
-	//var winner BidData
-
-	if auction.State == "closed" {
+	if auction.State == CLOSED {
 		err = errors.New("Error: auction is closed")
 		return
 	}
@@ -142,14 +134,21 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 	//// Invoke provides two methods "bid" or "close"
 	switch inst.Invoke.Command {
 	case "bid":
-		if auction.State == "open" {
+		if auction.State == OPEN {
+
+			bidCoins := make([]byte, 8)
+			binary.BigEndian.PutUint32(bidCoins, bid.Bid)
+			if err != nil {
+				err = errors.New("making converting bid to coins")
+				return
+			}
 
 			auction.Bids = append(auction.Bids, bid)
-			print(auction.Bids)
 
 			var auctionBuf []byte
 			auctionBuf, err = protobuf.Encode(&auction)
 			if err != nil {
+				log.LLvl4(err)
 				return
 			}
 
@@ -157,6 +156,28 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 				byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
 					ContractAuctionID, auctionBuf, darcID),
 			}
+
+			//_, _, err := getContract(instruct.InstanceID).Invoke(rst, instruct, []byzcoin.Coin{})
+			//if err != nil {
+			//	fmt.Println("Error invoke transfert, bidder can't bid")
+			//	fmt.Println(err)
+			//}
+
+			//accFactory, found := c.s.GetContractConstructor(contracts.ContractCoinID)
+			//if !found {
+			//	fmt.Println("Error invoke transfert: factory")
+			//}
+			//var acc byzcoin.Contract
+			//acc, err = accFactory(nil)
+			//if err != nil {
+			//	return nil, nil, fmt.Errorf("coult not spawn new zero instance: %v", err)
+			//}
+			//// _, _, err = acc.Invoke(rst, instruct, []byzcoin.Coin{})
+			//
+			//auction.Bids = append(auction.Bids, bid)
+			//log.LLvl4("the bids are", auction.Bids)
+			//
+
 		}
 	//case "close":
 	//	log.Lvl2("closing")
