@@ -40,7 +40,7 @@ func newBCTest(t *testing.T) (out *bcTest) {
 	// to create and update keyValue contracts.
 	var err error
 	out.gMsg, err = byzcoin.DefaultGenesisMsg(byzcoin.CurrentVersion, out.roster,
-		[]string{"spawn:auction", "invoke:auction.bid", "spawn:coin", "invoke:coin.mint"}, out.signer.Identity())
+		[]string{"spawn:auction", "invoke:auction.bid", "invoke:auction.close", "spawn:coin", "invoke:coin.mint"}, out.signer.Identity())
 	require.Nil(t, err)
 	out.gDarc = &out.gMsg.GenesisDarc
 
@@ -190,10 +190,9 @@ func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID,
 		GoodDescription: good,
 		SellerAccount:   sellAccInstID,
 		ReservePrice:    reservePrice,
-		Bids:            []BidData{},
+		HighestBid:      BidData{},
 		State:           OPEN,
-		WinnerAccount:   byzcoin.InstanceID{},
-		Deposits:        depAccInstID,
+		Deposit:         depAccInstID,
 	}
 
 	auctionBuf, err := protobuf.Encode(&auction)
@@ -213,10 +212,9 @@ func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID,
 	return auctInstID, auction
 }
 
-func (bct *bcTest) createBid(t *testing.T, auctInstID byzcoin.InstanceID, bidAccInstID byzcoin.InstanceID, bid uint32) BidData {
+func (bct *bcTest) addBid(t *testing.T, auctInstID byzcoin.InstanceID, bidAccInstID byzcoin.InstanceID, bid uint32) (BidData, error) {
 	bidata := BidData{
 		BidderAccount: bidAccInstID,
-		prevBid:       0,
 		Bid:           bid,
 	}
 
@@ -245,13 +243,36 @@ func (bct *bcTest) createBid(t *testing.T, auctInstID byzcoin.InstanceID, bidAcc
 		}},
 	}
 
-	bct.ct += 1
-
 	require.Nil(t, ctx.FillSignersAndSignWith(bct.signer))
 	_, err = bct.cl.AddTransactionAndWait(ctx, 10)
-	require.NoError(t, err)
+	if err == nil {
+		bct.ct += 1
+	}
 
-	return bidata
+	return bidata, err
+}
+
+func (bct *bcTest) closeAuction(t *testing.T, auctInstID byzcoin.InstanceID) error {
+
+	// Try to invoke
+	ctx := byzcoin.ClientTransaction{
+		Instructions: []byzcoin.Instruction{{
+			InstanceID: auctInstID,
+			Invoke: &byzcoin.Invoke{
+				ContractID: ContractAuctionID,
+				Command:    "close",
+			},
+			SignerCounter: []uint64{bct.ct},
+		}},
+	}
+
+	require.Nil(t, ctx.FillSignersAndSignWith(bct.signer))
+	_, err := bct.cl.AddTransactionAndWait(ctx, 10)
+	if err == nil {
+		bct.ct += 1
+	}
+
+	return err
 }
 
 func (bct *bcTest) verifCreateAuction(t *testing.T, auctInstID byzcoin.InstanceID, auction AuctionData) AuctionData {
@@ -267,12 +288,23 @@ func (bct *bcTest) verifCreateAuction(t *testing.T, auctInstID byzcoin.InstanceI
 
 }
 
-func (bct *bcTest) verifAddBidToAuction(t *testing.T, auctInstID byzcoin.InstanceID, auction AuctionData, bids []BidData) AuctionData {
+func (bct *bcTest) verifCloseAuction(t *testing.T, auctInstID byzcoin.InstanceID) AuctionData {
+
+	auctS := bct.proofAndDecodeAuction(t, auctInstID)
+
+	// Verify value.
+	require.Equal(t, auctS.State, CLOSED)
+
+	return auctS
+
+}
+
+func (bct *bcTest) verifAddBid(t *testing.T, auctInstID byzcoin.InstanceID, auction AuctionData, bid BidData) AuctionData {
 
 	auctS := bct.proofAndDecodeAuction(t, auctInstID)
 
 	// Verify value
-	require.Equal(t, bids, auctS.Bids)
+	require.Equal(t, bid, auctS.HighestBid)
 
 	return auctS
 
@@ -303,20 +335,5 @@ func printAuction(auction AuctionData) {
 	fmt.Println("Good: ", auction.GoodDescription)
 	fmt.Println("Reserve price: ", auction.ReservePrice)
 	fmt.Println("State: ", auction.State.String())
-	if auction.State == CLOSED {
-		fmt.Println("Winner: ", auction.WinnerAccount)
-	} else {
-		if len(auction.Bids) == 0 {
-			fmt.Println("Bids: none yet")
-		} else {
-			i := 1
-			fmt.Println("Bids: ")
-			for _, bid := range auction.Bids {
-				fmt.Println("	Bidder", i, ": ", bid.BidderAccount)
-				fmt.Println("		Bid:", bid.Bid)
-				i++
-			}
-		}
-	}
-
+	fmt.Println("Highest bidder: ", auction.HighestBid.BidderAccount, " with ", auction.HighestBid.Bid, "coins")
 }

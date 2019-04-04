@@ -3,6 +3,8 @@ package auctions
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"go.dedis.ch/cothority/v3/byzcoin"
 )
 
@@ -47,20 +49,38 @@ func TestContractAuction_Invoke(t *testing.T) {
 	reservePrice := uint32(0)
 	auctInstID, auctionData := bct.createAuction(t, sellAccInstID, depAccInstID, good, reservePrice)
 
-	//array of bids
-	bids := []BidData{}
-
 	//First bidder bids -> invoke bid
 	bid := uint32(10)
-	bidata := bct.createBid(t, auctInstID, bidAccInstID, bid)
-	bids = append(bids, bidata)
+	bidata, err := bct.addBid(t, auctInstID, bidAccInstID, bid)
+	require.NoError(t, err)
 
 	//Second bidder bids -> invoke bid
 	bid = uint32(30)
-	bidata = bct.createBid(t, auctInstID, bidAccInstID2, bid)
-	bids = append(bids, bidata)
+	bidata, err = bct.addBid(t, auctInstID, bidAccInstID2, bid)
+	require.NoError(t, err)
 
-	auctS := bct.verifAddBidToAuction(t, auctInstID, auctionData, bids)
-
+	auctS := bct.verifAddBid(t, auctInstID, auctionData, bidata)
 	printAuction(auctS)
+
+	//First bidder update bid
+	bid = uint32(20)
+	_, err = bct.addBid(t, auctInstID, bidAccInstID, bid)
+	require.Error(t, err, "cannot bid less than current highest bid")
+
+	auctS = bct.verifAddBid(t, auctInstID, auctionData, bidata)
+	printAuction(auctS)
+
+	//Close auction
+	bid = uint32(20)
+	err = bct.closeAuction(t, auctInstID)
+	require.NoError(t, err)
+
+	auctS = bct.verifCloseAuction(t, auctInstID)
+	printAuction(auctS)
+
+	//First bidder update bid
+	bid = uint32(40)
+	_, err = bct.addBid(t, auctInstID, bidAccInstID, bid)
+	require.Error(t, err, "auction is closed, cannot bid")
+
 }

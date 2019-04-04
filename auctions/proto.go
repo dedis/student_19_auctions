@@ -10,17 +10,16 @@ import "go.dedis.ch/cothority/v3/byzcoin"
 
 //Structures for an Auction instance
 
+//Enum auction state
 type state int
 
 const (
 	OPEN state = 1 + iota
-	PROCESSING
 	CLOSED
 )
 
 var states = [...]string{
 	"OPEN",
-	"PROCESSING",
 	"CLOSED",
 }
 
@@ -32,14 +31,12 @@ type AuctionData struct {
 	GoodDescription string
 	SellerAccount   byzcoin.InstanceID // The place credit (transfer the coins to) when the auction is over
 	ReservePrice    uint32
-	Bids            []BidData
-	State           state // open, processing or closed
-	Deposits        byzcoin.InstanceID
-	WinnerAccount   byzcoin.InstanceID
+	HighestBid      BidData
+	State           state // open or closed
+	Deposit         byzcoin.InstanceID
 }
 
 type BidData struct {
 	BidderAccount byzcoin.InstanceID // The place to refund if this bid is not accepted or debit if accepted.
-	prevBid       uint32             // serve also for previous bid
 	Bid           uint32
 }

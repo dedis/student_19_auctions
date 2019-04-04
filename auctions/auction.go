@@ -1,12 +1,10 @@
 package auctions
 
 import (
-	"encoding/binary"
 	"errors"
 
-	"go.dedis.ch/onet/v3/log"
-
 	"go.dedis.ch/cothority/v3/byzcoin"
+	"go.dedis.ch/cothority/v3/byzcoin/contracts"
 	"go.dedis.ch/cothority/v3/darc"
 	"go.dedis.ch/protobuf"
 )
@@ -95,10 +93,10 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		return
 	}
 
-	if inst.Invoke.Command != "close" {
+	if inst.Invoke.Command == "bid" {
 		bidBuf := inst.Invoke.Args.Search("bid")
 		if bidBuf == nil {
-			err = errors.New("Error: need an argument with name bid")
+			err = errors.New("need an argument with name bid")
 			return
 		}
 	}
@@ -111,84 +109,90 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		return
 	}
 
-	//Fill BidData structure
-	//Put the data from the inst.Spawn.Args into our BidData structure.
-	//bidBuf store the value of the argument with name bid
-	bidBuf := inst.Invoke.Args.Search("bid")
-	if bidBuf == nil {
-		return nil, nil, errors.New("need an argument with name bid")
-	}
-
-	//Verify that it's a bid
-	bid := BidData{}
-	err = protobuf.Decode(bidBuf, &bid)
-	if err != nil {
-		return nil, nil, errors.New("Error: not a bid")
-	}
-
 	if auction.State == CLOSED {
-		err = errors.New("Error: auction is closed")
-		return
+		err = errors.New("auction is closed, cannot bid")
+		return nil, nil, err
 	}
 
 	//// Invoke provides two methods "bid" or "close"
 	switch inst.Invoke.Command {
 	case "bid":
-		if auction.State == OPEN {
+		//Fill BidData structure
+		//Put the data from the inst.Spawn.Args into our BidData structure.
+		//bidBuf store the value of the argument with name bid
+		bidBuf := inst.Invoke.Args.Search("bid")
+		if bidBuf == nil {
+			return nil, nil, errors.New("need an argument with name bid")
+		}
 
-			bidCoins := make([]byte, 8)
-			binary.BigEndian.PutUint32(bidCoins, bid.Bid)
-			if err != nil {
-				err = errors.New("making converting bid to coins")
-				return
-			}
+		//Verify that it's a bid
+		bid := BidData{}
+		err = protobuf.Decode(bidBuf, &bid)
+		if err != nil {
+			return nil, nil, errors.New("not a bid")
+		}
 
-			auction.Bids = append(auction.Bids, bid)
+		if bid.Bid > auction.HighestBid.Bid {
 
-			var auctionBuf []byte
+			//bidCoins := make([]byte, 8)
+			//
+			////First check if new bidder has enough coins
+			//binary.BigEndian.PutUint32(bidCoins, bid.Bid)
+			//err := c.transferCoin(rst, bidCoins, bid.BidderAccount, auction.Deposit)
+			//if err != nil {
+			//	err = errors.New("not enough coins to bid")
+			//	return nil, nil, err
+			//}
+			//
+			////Second, refund old highest bidder
+			//binary.BigEndian.PutUint32(bidCoins, auction.HighestBid.Bid)
+			//err = c.transferCoin(rst, bidCoins, auction.Deposit, auction.HighestBid.BidderAccount)
+			//if err != nil {
+			//	err = errors.New("refunding old highest bidder not working")
+			//	return nil, nil, err
+			//}
+
+			//Then update highest bid/bidder
+			auction.HighestBid = bid
+
 			auctionBuf, err = protobuf.Encode(&auction)
 			if err != nil {
-				log.LLvl4(err)
-				return
+				return nil, nil, errors.New("encode auction buf sc")
 			}
 
 			sc = []byzcoin.StateChange{
 				byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
 					ContractAuctionID, auctionBuf, darcID),
 			}
-
-			//_, _, err := getContract(instruct.InstanceID).Invoke(rst, instruct, []byzcoin.Coin{})
-			//if err != nil {
-			//	fmt.Println("Error invoke transfert, bidder can't bid")
-			//	fmt.Println(err)
-			//}
-
-			//accFactory, found := c.s.GetContractConstructor(contracts.ContractCoinID)
-			//if !found {
-			//	fmt.Println("Error invoke transfert: factory")
-			//}
-			//var acc byzcoin.Contract
-			//acc, err = accFactory(nil)
-			//if err != nil {
-			//	return nil, nil, fmt.Errorf("coult not spawn new zero instance: %v", err)
-			//}
-			//// _, _, err = acc.Invoke(rst, instruct, []byzcoin.Coin{})
-			//
-			//auction.Bids = append(auction.Bids, bid)
-			//log.LLvl4("the bids are", auction.Bids)
-			//
-
+		} else {
+			err = errors.New("cannot bid less than current highest bid")
+			return nil, nil, err
 		}
-	//case "close":
-	//	log.Lvl2("closing")
-	//	auctData.State = "closed"
-	//	winner = getWinner(auctData.Bids)
-	//	//Transferring the coins from winner to seller
-	//	//trqnsfering coins is implemented in coins.go, but you need to
-	//	//cqll into that by using GetContrqctConstructor to make a contract factory
-	//	//then call it with the current value of the target account, which you get with GetValue.
-	//	//example of the difficulty/solution of how to call GetContractConstructor in insecure_darc.go
-	//
+
+	case "close":
+
+		//bidCoins := make([]byte, 8)
+		//
+		////Credit seller account
+		//binary.BigEndian.PutUint32(bidCoins, auction.HighestBid.Bid)
+		//err := c.transferCoin(rst, bidCoins, auction.Deposit, auction.SellerAccount)
+		//if err != nil {
+		//	err = errors.New("not enough coins to bid")
+		//	return nil, nil, err
+		//}
+
+		auction.State = CLOSED
+
+		auctionBuf, err = protobuf.Encode(&auction)
+		if err != nil {
+			return nil, nil, errors.New("encode auction buf sc: close")
+		}
+
+		sc = []byzcoin.StateChange{
+			byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+				ContractAuctionID, auctionBuf, darcID),
+		}
+
 	default:
 		err = errors.New("Auction contract can only bid or close")
 	}
@@ -196,13 +200,33 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 	return
 }
 
-//function getWinner
-func getWinner(bids []BidData) BidData {
-	var highestBid BidData = bids[0]
-	for _, value := range bids {
-		if highestBid.Bid < value.Bid {
-			highestBid = value
-		}
+func (c *contractAuction) transferCoin(rst byzcoin.ReadOnlyStateTrie, amount []byte, debitAccount byzcoin.InstanceID, creditAccount byzcoin.InstanceID) (err error) {
+	instruct := byzcoin.Instruction{
+		InstanceID: debitAccount,
+		Invoke: &byzcoin.Invoke{
+			ContractID: contracts.ContractCoinID,
+			Command:    "transfer",
+			Args: byzcoin.Arguments{
+				{Name: "coins", Value: amount},
+				{Name: "destination", Value: creditAccount.Slice()},
+			},
+		},
 	}
-	return highestBid
+
+	cFact, found := c.s.GetContractConstructor(contracts.ContractCoinID)
+	if !found {
+		return err
+	}
+
+	cCoin, err := cFact(nil)
+	if err != nil {
+		return err
+	}
+	_, _, err = cCoin.Invoke(rst, instruct, []byzcoin.Coin{})
+	if err != nil {
+		return err
+	}
+
+	return
+	//log.LLvl4(s)
 }
