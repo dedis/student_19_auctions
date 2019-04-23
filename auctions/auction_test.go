@@ -19,8 +19,8 @@ func TestContractAuction_Spawn(t *testing.T) {
 
 	//Creating auction
 	good := "bananas"
-	reservePrice := uint32(0)
-	auctInstID, auctionData := bct.createAuction(t, sellAccInstID, depAccInstID, good, reservePrice)
+	//reservePrice := uint64(0)
+	auctInstID, auctionData := bct.createAuction(t, sellAccInstID, depAccInstID, good)
 
 	//Verify auction
 	auctS := bct.verifCreateAuction(t, auctInstID, auctionData)
@@ -38,7 +38,7 @@ func TestContractAuction_Invoke(t *testing.T) {
 	sellAccInstID, depAccInstID := bct.createSellerAndDepositAccount(t)
 
 	//Creating bidder account with amount
-	amount := uint32(200)
+	amount := uint64(200)
 	bidAccInstID := bct.createBidderAccount(t, amount)
 
 	//Creating another bidder account with amount
@@ -46,24 +46,25 @@ func TestContractAuction_Invoke(t *testing.T) {
 
 	//Creating auction
 	good := "bananas"
-	reservePrice := uint32(0)
-	auctInstID, auctionData := bct.createAuction(t, sellAccInstID, depAccInstID, good, reservePrice)
+	//reservePrice := uint64(0)
+	auctInstID, auctionData := bct.createAuction(t, sellAccInstID, depAccInstID, good)
 
 	//First bidder bids -> invoke bid
-	bid := uint32(10)
+	bid := uint64(20)
 	bidata, err := bct.addBid(t, auctInstID, bidAccInstID, bid)
 	require.NoError(t, err)
 
 	//Second bidder bids -> invoke bid
-	bid = uint32(30)
+	bid = uint64(40)
 	bidata, err = bct.addBid(t, auctInstID, bidAccInstID2, bid)
 	require.NoError(t, err)
 
+	bidata.Bid = bid
 	auctS := bct.verifAddBid(t, auctInstID, auctionData, bidata)
 	printAuction(auctS)
 
 	//First bidder update bid
-	bid = uint32(20)
+	bid = uint64(40)
 	_, err = bct.addBid(t, auctInstID, bidAccInstID, bid)
 	require.Error(t, err, "cannot bid less than current highest bid")
 
@@ -71,7 +72,6 @@ func TestContractAuction_Invoke(t *testing.T) {
 	printAuction(auctS)
 
 	//Close auction
-	bid = uint32(20)
 	err = bct.closeAuction(t, auctInstID)
 	require.NoError(t, err)
 
@@ -79,7 +79,7 @@ func TestContractAuction_Invoke(t *testing.T) {
 	printAuction(auctS)
 
 	//First bidder update bid
-	bid = uint32(40)
+	bid = uint64(40)
 	_, err = bct.addBid(t, auctInstID, bidAccInstID, bid)
 	require.Error(t, err, "auction is closed, cannot bid")
 

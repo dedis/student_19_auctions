@@ -30,13 +30,13 @@ func (s state) String() string {
 type AuctionData struct {
 	GoodDescription string
 	SellerAccount   byzcoin.InstanceID // The place credit (transfer the coins to) when the auction is over
-	ReservePrice    uint32
-	HighestBid      BidData
-	State           state // open or closed
-	Deposit         byzcoin.InstanceID
+	//ReservePrice    uint64
+	HighestBid BidData
+	State      state // open or closed
+	Deposit    byzcoin.InstanceID
 }
 
 type BidData struct {
 	BidderAccount byzcoin.InstanceID // The place to refund if this bid is not accepted or debit if accepted.
-	Bid           uint32
+	Bid           uint64
 }

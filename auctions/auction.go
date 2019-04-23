@@ -1,6 +1,7 @@
 package auctions
 
 import (
+	"encoding/binary"
 	"errors"
 
 	"go.dedis.ch/cothority/v3/byzcoin"
@@ -15,15 +16,16 @@ var ContractAuctionID = "auction"
 type contractAuction struct {
 	byzcoin.BasicContract
 	AuctionData
-	s *byzcoin.Service
+	s *Service
 }
 
-func contractAuctionFromBytes(in []byte) (byzcoin.Contract, error) {
+func (s *Service) contractAuctionFromBytes(in []byte) (byzcoin.Contract, error) {
 	cv := &contractAuction{}
 	err := protobuf.Decode(in, &cv.AuctionData)
 	if err != nil {
 		return nil, err
 	}
+	cv.s = s
 	return cv, nil
 }
 
@@ -83,10 +85,7 @@ func (c *contractAuction) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Inst
 //  - close: ends an auction
 // You can only delete a contractAuction instance after the auction is closed.
 
-func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruction, coins []byzcoin.Coin) (sc []byzcoin.StateChange, cout []byzcoin.Coin, err error) {
-
-	cout = coins
-
+func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Instruction, cin []byzcoin.Coin) (sc []byzcoin.StateChange, cout []byzcoin.Coin, err error) {
 	var darcID darc.ID
 	_, _, _, darcID, err = rst.GetValues(inst.InstanceID.Slice())
 	if err != nil {
@@ -122,64 +121,102 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		//bidBuf store the value of the argument with name bid
 		bidBuf := inst.Invoke.Args.Search("bid")
 		if bidBuf == nil {
-			return nil, nil, errors.New("need an argument with name bid")
+			err = errors.New("need an argument with name bid")
+			return
 		}
 
 		//Verify that it's a bid
 		bid := BidData{}
 		err = protobuf.Decode(bidBuf, &bid)
 		if err != nil {
-			return nil, nil, errors.New("not a bid")
+			err = errors.New("not a bid")
+			return
 		}
 
-		if bid.Bid > auction.HighestBid.Bid {
+		for i := 0; i < len(cin); i++ {
+			//log.LLvl4(cin[i].Name)
+			bid.Bid = bid.Bid + cin[i].Value
+		}
 
-			//bidCoins := make([]byte, 8)
-			//
-			////First check if new bidder has enough coins
-			//binary.BigEndian.PutUint32(bidCoins, bid.Bid)
-			//err := c.transferCoin(rst, bidCoins, bid.BidderAccount, auction.Deposit)
-			//if err != nil {
-			//	err = errors.New("not enough coins to bid")
-			//	return nil, nil, err
-			//}
-			//
-			////Second, refund old highest bidder
-			//binary.BigEndian.PutUint32(bidCoins, auction.HighestBid.Bid)
-			//err = c.transferCoin(rst, bidCoins, auction.Deposit, auction.HighestBid.BidderAccount)
-			//if err != nil {
-			//	err = errors.New("refunding old highest bidder not working")
-			//	return nil, nil, err
-			//}
+		//log.LLvl4(bid.Bid)
 
-			//Then update highest bid/bidder
-			auction.HighestBid = bid
+		if bid.Bid <= 0 { //can not bid 0 or less
+			err = errors.New("can not bid 0 or less")
+			return
 
-			auctionBuf, err = protobuf.Encode(&auction)
-			if err != nil {
-				return nil, nil, errors.New("encode auction buf sc")
-			}
-
-			sc = []byzcoin.StateChange{
-				byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
-					ContractAuctionID, auctionBuf, darcID),
-			}
 		} else {
-			err = errors.New("cannot bid less than current highest bid")
-			return nil, nil, err
+			if auction.HighestBid.Bid == 0 { //first bid
+				//todo: incremental bid if same bidder
+				sc, _, _ = c.storeCoin(rst, cin, auction.Deposit)
+				if err != nil {
+					err = errors.New("storeCoin")
+					return
+				}
+
+				//proof, err := rst.GetProof(auction.Deposit.Slice())
+				//if err != nil {
+				//	return
+				//}
+				//
+				//_, val := proof.KeyValue()
+
+				//Then update highest bid/bidder
+				auction.HighestBid = bid
+				auctionBuf, err = protobuf.Encode(&auction)
+
+				sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+					ContractAuctionID, auctionBuf, darcID))
+
+			} else if bid.Bid > auction.HighestBid.Bid {
+
+				//Refund old highest bidder
+				bidCoins := make([]byte, 8)
+				binary.LittleEndian.PutUint64(bidCoins, auction.HighestBid.Bid)
+
+				sc, _, err = c.transferCoin(rst, bidCoins, auction.Deposit, auction.HighestBid.BidderAccount)
+				if err != nil {
+					return
+				}
+
+				//log.LLvl4("Transfer 1 work")
+
+				//Store new highest bidder
+				binary.LittleEndian.PutUint64(bidCoins, bid.Bid)
+				//sc2, _, _ := c.storeCoin(rst, bidCoins, auction.Deposit)
+				sc2, _, _ := c.storeCoin(rst, cin, auction.Deposit)
+				//sc2, _, _ := c.storeCoin(rst, bid.Bid, auction.Deposit)
+				if err != nil {
+					err = errors.New("storeCoin")
+					return
+				}
+
+				//log.LLvl4("Store 2 work")
+
+				//Then update highest bid/bidder
+				auction.HighestBid = bid
+				auctionBuf, err = protobuf.Encode(&auction)
+
+				sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+					ContractAuctionID, auctionBuf, darcID))
+
+				sc = append(sc, sc2...)
+
+			} else {
+				err = errors.New("cannot bid less than current highest bid")
+				return
+			}
 		}
 
 	case "close":
 
-		//bidCoins := make([]byte, 8)
+		bidCoin := make([]byte, 8)
 		//
 		////Credit seller account
-		//binary.BigEndian.PutUint32(bidCoins, auction.HighestBid.Bid)
-		//err := c.transferCoin(rst, bidCoins, auction.Deposit, auction.SellerAccount)
-		//if err != nil {
-		//	err = errors.New("not enough coins to bid")
-		//	return nil, nil, err
-		//}
+		binary.LittleEndian.PutUint64(bidCoin, auction.HighestBid.Bid)
+		sc, cout, err = c.transferCoin(rst, bidCoin, auction.Deposit, auction.SellerAccount)
+		if err != nil {
+			return
+		}
 
 		auction.State = CLOSED
 
@@ -188,10 +225,8 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 			return nil, nil, errors.New("encode auction buf sc: close")
 		}
 
-		sc = []byzcoin.StateChange{
-			byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
-				ContractAuctionID, auctionBuf, darcID),
-		}
+		sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+			ContractAuctionID, auctionBuf, darcID))
 
 	default:
 		err = errors.New("Auction contract can only bid or close")
@@ -200,7 +235,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 	return
 }
 
-func (c *contractAuction) transferCoin(rst byzcoin.ReadOnlyStateTrie, amount []byte, debitAccount byzcoin.InstanceID, creditAccount byzcoin.InstanceID) (err error) {
+func (c *contractAuction) transferCoin(rst byzcoin.ReadOnlyStateTrie, amount []byte, debitAccount byzcoin.InstanceID, creditAccount byzcoin.InstanceID) (sc []byzcoin.StateChange, cout []byzcoin.Coin, err error) {
 	instruct := byzcoin.Instruction{
 		InstanceID: debitAccount,
 		Invoke: &byzcoin.Invoke{
@@ -213,20 +248,54 @@ func (c *contractAuction) transferCoin(rst byzcoin.ReadOnlyStateTrie, amount []b
 		},
 	}
 
-	cFact, found := c.s.GetContractConstructor(contracts.ContractCoinID)
+	b := c.s.Service(byzcoin.ServiceName).(*byzcoin.Service)
+	cFact, found := b.GetContractConstructor(contracts.ContractCoinID)
 	if !found {
-		return err
+		err = errors.New("Not found")
+		return
 	}
 
-	cCoin, err := cFact(nil)
+	in, _, _, _, err := rst.GetValues(debitAccount.Slice())
 	if err != nil {
-		return err
-	}
-	_, _, err = cCoin.Invoke(rst, instruct, []byzcoin.Coin{})
-	if err != nil {
-		return err
+		err = errors.New("cfactory getValues failed")
+		return
 	}
 
-	return
-	//log.LLvl4(s)
+	cCoin, err := cFact(in)
+	if err != nil {
+		err = errors.New("coin factory failed")
+		return
+	}
+	return cCoin.Invoke(rst, instruct, []byzcoin.Coin{})
+}
+
+func (c *contractAuction) storeCoin(rst byzcoin.ReadOnlyStateTrie, amount []byzcoin.Coin, creditAccount byzcoin.InstanceID) (sc []byzcoin.StateChange, cout []byzcoin.Coin, err error) {
+	instruct := byzcoin.Instruction{
+		InstanceID: creditAccount,
+		Invoke: &byzcoin.Invoke{
+			ContractID: contracts.ContractCoinID,
+			Command:    "store",
+			Args:       nil,
+		},
+	}
+
+	b := c.s.Service(byzcoin.ServiceName).(*byzcoin.Service)
+	cFact, found := b.GetContractConstructor(contracts.ContractCoinID)
+	if !found {
+		err = errors.New("Not found")
+		return
+	}
+
+	in, _, _, _, err := rst.GetValues(creditAccount.Slice())
+	if err != nil {
+		err = errors.New("cfactory getValues failed")
+		return
+	}
+
+	cCoin, err := cFact(in)
+	if err != nil {
+		err = errors.New("coin factory failed")
+		return
+	}
+	return cCoin.Invoke(rst, instruct, amount)
 }
