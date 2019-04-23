@@ -139,6 +139,14 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		}
 
 		//log.LLvl4(bid.Bid)
+		//todo
+		// check coin name with rst getValues
+		// In unit test, test with different coins name
+		// Delete deposit account and just keep track of the money
+		// At the end, do a store with a created coin array (c1 remember) with the same name and value
+		// instead of transfer
+		// Write test of test that can crash: bid with 0 can work? auction with no bid can it close? etc
+		// !! List of the weeks left and my plans for finishing the project god
 
 		if bid.Bid <= 0 { //can not bid 0 or less
 			err = errors.New("can not bid 0 or less")
@@ -213,6 +221,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		//
 		////Credit seller account
 		binary.LittleEndian.PutUint64(bidCoin, auction.HighestBid.Bid)
+		//.storeCoin()
 		sc, cout, err = c.transferCoin(rst, bidCoin, auction.Deposit, auction.SellerAccount)
 		if err != nil {
 			return
