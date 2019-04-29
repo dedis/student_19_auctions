@@ -106,7 +106,7 @@ func (bct *bcTest) updateInstance(t *testing.T, instID byzcoin.InstanceID, args 
 	require.Nil(t, err)
 }
 
-func (bct *bcTest) createSellerAndDepositAccount(t *testing.T) (byzcoin.InstanceID, byzcoin.InstanceID) {
+func (bct *bcTest) createSellerAccount(t *testing.T) byzcoin.InstanceID {
 	inst := byzcoin.Instruction{
 		InstanceID: byzcoin.NewInstanceID(bct.gDarc.GetBaseID()),
 		Spawn: &byzcoin.Spawn{
@@ -116,27 +116,17 @@ func (bct *bcTest) createSellerAndDepositAccount(t *testing.T) (byzcoin.Instance
 		SignerCounter:    []uint64{bct.ct},
 	}
 
-	inst1 := byzcoin.Instruction{
-		InstanceID: byzcoin.NewInstanceID(bct.gDarc.GetBaseID()),
-		Spawn: &byzcoin.Spawn{
-			ContractID: contracts.ContractCoinID,
-		},
-		SignerIdentities: []darc.Identity{bct.signer.Identity()},
-		SignerCounter:    []uint64{bct.ct + 1},
-	}
-
-	ctx := byzcoin.ClientTransaction{Instructions: byzcoin.Instructions{inst, inst1}}
+	ctx := byzcoin.ClientTransaction{Instructions: byzcoin.Instructions{inst}}
 	err := ctx.FillSignersAndSignWith(bct.signer)
 	require.NoError(t, err)
 
 	_, err = bct.cl.AddTransactionAndWait(ctx, 10)
 	require.NoError(t, err)
-	bct.ct += 2
+	bct.ct += 1
 
 	sellAccInstID := ctx.Instructions[0].DeriveID("")
-	depAccInstID := ctx.Instructions[1].DeriveID("")
 
-	return sellAccInstID, depAccInstID
+	return sellAccInstID
 }
 
 func (bct *bcTest) createBidderAccount(t *testing.T, amount uint64) byzcoin.InstanceID {
@@ -185,13 +175,12 @@ func (bct *bcTest) createBidderAccount(t *testing.T, amount uint64) byzcoin.Inst
 	return bidAccInstID
 }
 
-func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID, depAccInstID byzcoin.InstanceID, good string) (byzcoin.InstanceID, AuctionData) {
+func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID, good string) (byzcoin.InstanceID, AuctionData) {
 	auction := AuctionData{
 		GoodDescription: good,
 		SellerAccount:   sellAccInstID,
 		HighestBid:      BidData{},
 		State:           OPEN,
-		Deposit:         depAccInstID,
 	}
 
 	auctionBuf, err := protobuf.Encode(&auction)
@@ -212,6 +201,63 @@ func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID,
 }
 
 func (bct *bcTest) addBid(t *testing.T, auctInstID byzcoin.InstanceID, bidAccInstID byzcoin.InstanceID, bid uint64) (BidData, error) {
+	bidata := BidData{
+		BidderAccount: bidAccInstID,
+	}
+
+	bidBuf, err := protobuf.Encode(&bidata)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bidArgs := byzcoin.Arguments{
+		{
+			Name:  "bid",
+			Value: bidBuf,
+		},
+	}
+
+	amount := make([]byte, 8)
+	binary.LittleEndian.PutUint64(amount, bid)
+
+	inst := byzcoin.Instruction{
+		InstanceID: bidAccInstID,
+		Invoke: &byzcoin.Invoke{
+			ContractID: contracts.ContractCoinID,
+			Command:    "fetch",
+			Args: byzcoin.Arguments{
+				{
+					Name:  "coins",
+					Value: amount,
+				},
+			},
+		},
+		SignerIdentities: []darc.Identity{bct.signer.Identity()},
+		SignerCounter:    []uint64{bct.ct},
+	}
+
+	inst1 := byzcoin.Instruction{
+		InstanceID: auctInstID,
+		Invoke: &byzcoin.Invoke{
+			ContractID: ContractAuctionID,
+			Command:    "bid",
+			Args:       bidArgs,
+		},
+		SignerIdentities: []darc.Identity{bct.signer.Identity()},
+		SignerCounter:    []uint64{bct.ct + 1},
+	}
+
+	ctx := byzcoin.ClientTransaction{Instructions: byzcoin.Instructions{inst, inst1}}
+
+	require.Nil(t, ctx.FillSignersAndSignWith(bct.signer))
+	_, err = bct.cl.AddTransactionAndWait(ctx, 10)
+	if err == nil {
+		bct.ct += 2
+	}
+	return bidata, err
+}
+
+func (bct *bcTest) addBidWithDiffCoinName(t *testing.T, auctInstID byzcoin.InstanceID, bidAccInstID byzcoin.InstanceID, bid uint64) (BidData, error) {
 	bidata := BidData{
 		BidderAccount: bidAccInstID,
 	}

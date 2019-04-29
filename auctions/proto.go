@@ -33,7 +33,7 @@ type AuctionData struct {
 	//ReservePrice    uint64
 	HighestBid BidData
 	State      state // open or closed
-	Deposit    byzcoin.InstanceID
+	//Deposit    byzcoin.InstanceID
 }
 
 type BidData struct {
