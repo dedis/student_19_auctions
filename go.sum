@@ -42,11 +42,15 @@ go.dedis.ch/kyber/v3 v3.0.2/go.mod h1:OzvaEnPvKlyrWyp3kGXlFdp7ap1VC6RkZDTaPikqhs
 go.dedis.ch/onet/v3 v3.0.1/go.mod h1:xqmP2+NvxeNzgmNj/4hf56EZm3KT0Qksz98miZw5G3A=
 go.dedis.ch/onet/v3 v3.0.4 h1:sIHdiuhg5LMVVDAKQbSiBZsQnJGP2EDxImcp12OnWKo=
 go.dedis.ch/onet/v3 v3.0.4/go.mod h1:p6Tt4NAoBifx3tHSzLwJ8Aq9RXDS/mfhxvdH3nqLWjI=
+go.dedis.ch/onet/v3 v3.0.5 h1:Ysm96KuRt1OavrRpa1Vi09DqljXBCDwaiur34DTvra8=
+go.dedis.ch/onet/v3 v3.0.5/go.mod h1:0wrof0zfyD+Qfw9Pfhu9jW+bTbwwWBzC1hMuV/c8v2w=
 go.dedis.ch/protobuf v1.0.5/go.mod h1:eIV4wicvi6JK0q/QnfIEGeSFNG0ZeB24kzut5+HaRLo=
 go.dedis.ch/protobuf v1.0.6 h1:E61p2XjYbYrTf3WeXE8M8Ui5WA3hX/NgbHHi5D0FLxI=
 go.dedis.ch/protobuf v1.0.6/go.mod h1:YHYXW6dQ9p2iJ3f+2fxKnOpjGx0MvL4cwpg1RVNXaV8=
 go.etcd.io/bbolt v1.3.0 h1:oY10fI923Q5pVCVt1GBTZMn8LHo5M+RCInFpeMnV4QI=
 go.etcd.io/bbolt v1.3.0/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
+go.etcd.io/bbolt v1.3.2 h1:Z/90sZLPOeCy2PwprqkFa25PdkusRzaj9P8zm/KNyvk=
+go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190320223903-b7391e95e576 h1:aUX/1G2gFSs4AsJJg2cL3HuoRhCSCz733FE5GUSuaT4=
 golang.org/x/crypto v0.0.0-20190320223903-b7391e95e576/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

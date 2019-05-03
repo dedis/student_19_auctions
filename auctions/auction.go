@@ -12,6 +12,11 @@ import (
 // ContractAuctionID identifies an auction contract
 var ContractAuctionID = "auction"
 
+type ContractCoin struct {
+	byzcoin.BasicContract
+	byzcoin.Coin
+}
+
 type contractAuction struct {
 	byzcoin.BasicContract
 	AuctionData
@@ -140,7 +145,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 
 		//Check the coin name
 		val, _, _, _, _ := rst.GetValues(bid.BidderAccount.Slice())
-		coinS := contracts.ContractCoin{} //need this struct
+		coinS := ContractCoin{} //need this struct
 		//var coinS struct{}
 		err = protobuf.Decode(val, &coinS)
 		if err != nil {
@@ -244,7 +249,7 @@ func (c *contractAuction) storeCoin(rst byzcoin.ReadOnlyStateTrie, amount uint64
 		return
 	}
 
-	coinS := contracts.ContractCoin{} //need this struct
+	coinS := ContractCoin{} //need this struct
 	err = protobuf.Decode(in, &coinS)
 	if err != nil {
 		return
