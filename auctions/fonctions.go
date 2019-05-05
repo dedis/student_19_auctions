@@ -400,7 +400,7 @@ func printAuction(auction AuctionData) {
 	fmt.Println("Highest bidder: ", auction.HighestBid.BidderAccount, " with ", auction.HighestBid.Bid, "coins")
 }
 
-type state int
+type state uint64
 
 const (
 	OPEN state = 1 + iota
