@@ -399,3 +399,19 @@ func printAuction(auction AuctionData) {
 	fmt.Println("State: ", auction.State.String())
 	fmt.Println("Highest bidder: ", auction.HighestBid.BidderAccount, " with ", auction.HighestBid.Bid, "coins")
 }
+
+type state int
+
+const (
+	OPEN state = 1 + iota
+	CLOSED
+)
+
+var states = [...]string{
+	"OPEN",
+	"CLOSED",
+}
+
+func (s state) String() string {
+	return states[s-1]
+}

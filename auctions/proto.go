@@ -1,42 +1,28 @@
 package auctions
 
-import "go.dedis.ch/cothority/v3/byzcoin"
-
-// PROTOSTART
-// package auction;
-//
-// option java_package = "ch.epfl.dedis.template.proto";
-// option java_outer_classname = "AuctionProto";
-
-//Structures for an Auction instance
-
-//Enum auction state
-type state int
-
-const (
-	OPEN state = 1 + iota
-	CLOSED
+import (
+	"go.dedis.ch/cothority/v3/byzcoin"
 )
 
-var states = [...]string{
-	"OPEN",
-	"CLOSED",
-}
+// PROTOSTART
+// package auctions;
+// type :state:sint64
+// import "byzcoin.proto";
+//
+// option java_package = "ch.epfl.dedis.lib.proto";
+// option java_outer_classname = "Auction";
 
-func (s state) String() string {
-	return states[s-1]
-}
+// Auction struct
 
 type AuctionData struct {
 	GoodDescription string
-	SellerAccount   byzcoin.InstanceID // The place credit (transfer the coins to) when the auction is over
-	//ReservePrice    uint64
+	SellerAccount   byzcoin.InstanceID
+	//InitialPrice    uint64
 	HighestBid BidData
-	State      state // open or closed
-	//Deposit    byzcoin.InstanceID
+	State      state
 }
 
 type BidData struct {
-	BidderAccount byzcoin.InstanceID // The place to refund if this bid is not accepted or debit if accepted.
+	BidderAccount byzcoin.InstanceID
 	Bid           uint64
 }
