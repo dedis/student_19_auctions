@@ -17,12 +17,12 @@ import (
 type AuctionData struct {
 	GoodDescription string
 	SellerAccount   byzcoin.InstanceID
-	//InitialPrice    uint64
+	//InitialPrice    int64
 	HighestBid BidData
 	State      state
 }
 
 type BidData struct {
 	BidderAccount byzcoin.InstanceID
-	Bid           uint64
+	Bid           int64
 }

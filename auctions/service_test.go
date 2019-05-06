@@ -7,5 +7,5 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	log.MainTest(m, 0)
+	log.MainTest(m)
 }
