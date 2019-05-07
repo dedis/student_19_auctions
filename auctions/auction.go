@@ -5,7 +5,6 @@ import (
 	"go.dedis.ch/cothority/v3/byzcoin"
 	"go.dedis.ch/cothority/v3/byzcoin/contracts"
 	"go.dedis.ch/cothority/v3/darc"
-	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/protobuf"
 )
 
@@ -61,7 +60,7 @@ func (c *contractAuction) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Inst
 
 	//Verify that it's an auction
 	auction := AuctionData{}
-	log.LLvl4(auctionBuf)
+	// log.LLvl4(auctionBuf)
 	err = protobuf.Decode(auctionBuf, &auction)
 	if err != nil {
 		//return nil, nil, errors.New("Error: not an auction")
