@@ -6,7 +6,6 @@ import (
 
 // PROTOSTART
 // package auctions;
-// type :state:sint64
 // import "byzcoin.proto";
 //
 // option java_package = "ch.epfl.dedis.lib.proto";
@@ -21,7 +20,7 @@ type AuctionData struct {
 	//HighestBid BidData
 	HighestBid    uint64
 	HighestBidder byzcoin.InstanceID
-	State         state
+	State         string
 }
 
 type BidData struct {

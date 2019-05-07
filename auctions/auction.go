@@ -112,7 +112,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		return
 	}
 
-	if auction.State == CLOSED {
+	if auction.State == "CLOSED" {
 		err = errors.New("auction is closed, cannot bid")
 		return nil, nil, err
 	}
@@ -205,7 +205,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 				return
 			}
 		}
-		auction.State = CLOSED
+		auction.State = "CLOSED"
 
 		auctionBuf, err = protobuf.Encode(&auction)
 		if err != nil {

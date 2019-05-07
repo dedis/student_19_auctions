@@ -184,7 +184,7 @@ func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID,
 		SellerAccount:   sellAccInstID,
 		HighestBid:      0,
 		HighestBidder:   instID,
-		State:           OPEN,
+		State:           "OPEN",
 	}
 
 	auctionBuf, err := protobuf.Encode(&auction)
@@ -359,7 +359,7 @@ func (bct *bcTest) verifCloseAuction(t *testing.T, auctInstID byzcoin.InstanceID
 	auctS := bct.proofAndDecodeAuction(t, auctInstID)
 
 	// Verify value.
-	require.Equal(t, auctS.State, CLOSED)
+	require.Equal(t, auctS.State, "CLOSED")
 
 	return auctS
 
@@ -401,22 +401,18 @@ func printAuction(auction AuctionData) {
 	fmt.Println("Seller account: ", auction.SellerAccount)
 	fmt.Println("Good: ", auction.GoodDescription)
 	//fmt.Println("Reserve price: ", auction.ReservePrice)
-	fmt.Println("State: ", auction.State.String())
+	//fmt.Println("State: ", auction.State.String())
+	fmt.Println("State: ", auction.State)
 	fmt.Println("Highest bidder: ", auction.HighestBidder, " with ", auction.HighestBid, "coins")
 }
 
-type state uint64
+//type state uint64
+//
+//var states = [...]string{
+//	"OPEN",
+//	"CLOSED",
+//}
 
-const (
-	OPEN state = 1 + iota
-	CLOSED
-)
-
-var states = [...]string{
-	"OPEN",
-	"CLOSED",
-}
-
-func (s state) String() string {
-	return states[s-1]
-}
+//func (s state) String() string {
+//	return states[s-1]
+//}
