@@ -63,8 +63,7 @@ func (c *contractAuction) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Inst
 	auction := AuctionData{}
 	err = protobuf.Decode(auctionBuf, &auction)
 	if err != nil {
-		// return nil, nil, errors.New("Error: not an auction")
-		return
+		return nil, nil, errors.New("Error: not an auction")
 	}
 
 	// Create the auction instance in the global state thanks to
