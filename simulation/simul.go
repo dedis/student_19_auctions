@@ -177,8 +177,7 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 		auction := auctions.AuctionData{
 			GoodDescription: "Bananas",
 			SellerAccount:   sellerAccount,
-			HighestBid:      auctions.BidData{},
-			State:           auctions.OPEN,
+			State:           "OPEN",
 		}
 
 		auctionBuf, err := protobuf.Encode(&auction)
