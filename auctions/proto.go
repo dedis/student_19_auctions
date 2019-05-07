@@ -9,7 +9,7 @@ import (
 // import "byzcoin.proto";
 //
 // option java_package = "ch.epfl.dedis.lib.proto";
-// option java_outer_classname = "Auction";
+// option java_outer_classname = "Auctions";
 
 // Auction struct
 
