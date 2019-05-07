@@ -60,7 +60,6 @@ func (c *contractAuction) Spawn(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Inst
 
 	//Verify that it's an auction
 	auction := AuctionData{}
-	// log.LLvl4(auctionBuf)
 	err = protobuf.Decode(auctionBuf, &auction)
 	if err != nil {
 		//return nil, nil, errors.New("Error: not an auction")
