@@ -167,23 +167,25 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 			return
 
 		} else {
-			if auction.HighestBid.Bid == 0 { //first bid
+			if auction.HighestBid == 0 { //first bid
 
-				auction.HighestBid = bid
+				auction.HighestBid = bid.Bid
+				auction.HighestBidder = bid.BidderAccount
 				auctionBuf, err = protobuf.Encode(&auction)
 
 				sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
 					ContractAuctionID, auctionBuf, darcID))
 
-			} else if bid.Bid > auction.HighestBid.Bid {
+			} else if bid.Bid > auction.HighestBid {
 				//Refund old highest bidder
-				sc, _, err = c.storeCoin(rst, auction.HighestBid.Bid, auction.HighestBid.BidderAccount)
+				sc, _, err = c.storeCoin(rst, auction.HighestBid, auction.HighestBidder)
 				if err != nil {
 					return
 				}
 
 				//Then update highest bid/bidder
-				auction.HighestBid = bid
+				auction.HighestBid = bid.Bid
+				auction.HighestBidder = bid.BidderAccount
 				auctionBuf, err = protobuf.Encode(&auction)
 
 				sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
@@ -197,8 +199,8 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 
 	case "close":
 
-		if auction.HighestBid.Bid > 0 {
-			sc, cout, err = c.storeCoin(rst, auction.HighestBid.Bid, auction.SellerAccount)
+		if auction.HighestBid > 0 {
+			sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.SellerAccount)
 			if err != nil {
 				return
 			}

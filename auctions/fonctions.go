@@ -176,10 +176,14 @@ func (bct *bcTest) createBidderAccount(t *testing.T, amount uint64) byzcoin.Inst
 }
 
 func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID, good string) (byzcoin.InstanceID, AuctionData) {
+
+	instID := byzcoin.InstanceID{}
+
 	auction := AuctionData{
 		GoodDescription: good,
 		SellerAccount:   sellAccInstID,
-		HighestBid:      BidData{},
+		HighestBid:      0,
+		HighestBidder:   instID,
 		State:           OPEN,
 	}
 
@@ -366,7 +370,8 @@ func (bct *bcTest) verifAddBid(t *testing.T, auctInstID byzcoin.InstanceID, auct
 	auctS := bct.proofAndDecodeAuction(t, auctInstID)
 
 	// Verify value
-	require.Equal(t, bid, auctS.HighestBid)
+	require.Equal(t, bid.Bid, auctS.HighestBid)
+	require.Equal(t, bid.BidderAccount, auctS.HighestBidder)
 
 	return auctS
 
@@ -397,7 +402,7 @@ func printAuction(auction AuctionData) {
 	fmt.Println("Good: ", auction.GoodDescription)
 	//fmt.Println("Reserve price: ", auction.ReservePrice)
 	fmt.Println("State: ", auction.State.String())
-	fmt.Println("Highest bidder: ", auction.HighestBid.BidderAccount, " with ", auction.HighestBid.Bid, "coins")
+	fmt.Println("Highest bidder: ", auction.HighestBidder, " with ", auction.HighestBid, "coins")
 }
 
 type state uint64
