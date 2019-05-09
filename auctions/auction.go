@@ -218,10 +218,11 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 	case "drop":
 
 		auction.State = "DROPPED"
-
-		sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.HighestBidder)
-		if err != nil {
-			return
+		if auction.HighestBid > 0 {
+			sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.HighestBidder)
+			if err != nil {
+				return
+			}
 		}
 
 		auctionBuf, err = protobuf.Encode(&auction)
