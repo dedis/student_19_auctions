@@ -234,7 +234,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 			ContractAuctionID, auctionBuf, darcID))
 
 	default:
-		err = errors.New("Auction contract can only bid or close")
+		err = errors.New("Auction contract can only bid close or drop")
 	}
 
 	return
