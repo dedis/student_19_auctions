@@ -17,7 +17,6 @@ type AuctionData struct {
 	GoodDescription string
 	SellerAccount   byzcoin.InstanceID
 	//InitialPrice    uint64
-	//HighestBid BidData
 	HighestBid    uint64
 	HighestBidder byzcoin.InstanceID
 	State         string
