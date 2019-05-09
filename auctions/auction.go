@@ -112,8 +112,8 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		return
 	}
 
-	if auction.State == "CLOSED" {
-		err = errors.New("auction is closed, cannot bid")
+	if auction.State == "CLOSED" || auction.State == "DROPPED" {
+		err = errors.New("auction is closed or dropped, cannot bid")
 		return nil, nil, err
 	}
 
@@ -210,6 +210,18 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		auctionBuf, err = protobuf.Encode(&auction)
 		if err != nil {
 			return nil, nil, errors.New("encode auction buf sc: close")
+		}
+
+		sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+			ContractAuctionID, auctionBuf, darcID))
+
+	case "drop":
+
+		auction.State = "DROPPED"
+
+		auctionBuf, err = protobuf.Encode(&auction)
+		if err != nil {
+			return nil, nil, errors.New("encode auction buf sc: drop")
 		}
 
 		sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
