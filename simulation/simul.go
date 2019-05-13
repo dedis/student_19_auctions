@@ -30,6 +30,7 @@ type SimulationService struct {
 	onet.SimulationBFTree
 	BlockInterval string
 	Bidders       int
+	Bids          int
 }
 
 // NewSimulationService returns the new simulation, where all fields are
@@ -77,7 +78,7 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 
 	// Create the ledger
 	gm, err := byzcoin.DefaultGenesisMsg(byzcoin.CurrentVersion, config.Roster,
-		[]string{"spawn:auction", "invoke:auction.bid", "invoke:auction.close", "spawn:coin", "invoke:coin.mint", "invoke:coin.fetch"}, signer.Identity())
+		[]string{"spawn:auction", "invoke:auction.bid", "invoke:auction.close", "invoke:auction.drop", "spawn:coin", "invoke:coin.mint", "invoke:coin.fetch"}, signer.Identity())
 	if err != nil {
 		return errors.New("couldn't setup genesis message: " + err.Error())
 	}
@@ -119,6 +120,7 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 	tx := byzcoin.ClientTransaction{
 		Instructions: instr,
 	}
+
 	if err = tx.FillSignersAndSignWith(signer); err != nil {
 		return errors.New("signing of instruction failed: " + err.Error())
 	}

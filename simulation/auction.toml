@@ -2,14 +2,14 @@ Simulation = "Auction"
 Servers = 2
 Hosts = 5
 Depth = 1
-Rounds = 1
+Rounds = 2
 RunWait = "6000s"
 Suite = "Ed25519"
 BlockInterval = "1s"
 
 # This section of the file lists test scenarios, one per line, with variables
 # to vary, separated by tabs.
-Bidders, Bids
+Bidders,    Bids
 20,     1
 #200,     5
 
