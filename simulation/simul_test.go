@@ -8,7 +8,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	log.MainTest(m)
+	log.MainTest(m, 0)
 }
 
 func TestSimulation(t *testing.T) {

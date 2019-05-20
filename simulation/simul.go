@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -176,9 +177,13 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 		roundM := monitor.NewTimeMeasure("round")
 
 		// Open auction
+		instID := byzcoin.InstanceID{}
+
 		auction := auctions.AuctionData{
-			GoodDescription: "Bananas",
+			GoodDescription: "bananas",
 			SellerAccount:   sellerAccount,
+			HighestBid:      0,
+			HighestBidder:   instID,
 			State:           "OPEN",
 		}
 
@@ -215,12 +220,85 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 		send := monitor.NewTimeMeasure("send")
 		_, err = c.AddTransaction(tx)
 		if err != nil {
-			return errors.New("couldn't add transfer transaction: " + err.Error())
+			return errors.New("couldn't add spawn auction transaction: " + err.Error())
 		}
+
+		// Get auction instance ID
+		auctionID := tx.Instructions[0].DeriveID("")
+
 		send.Record()
 
 		// Now write two loops from 0 to s.Bidders and from 0 to s.Bids
 		// and send in bids.
+
+		amount := make([]byte, 8)
+		bidamount := uint64(0)
+
+		for loop1 := 0; loop1 < s.Bids; loop1++ {
+
+			for loop2 := 0; loop2 < s.Bidders; loop2++ {
+
+				bidata := auctions.BidData{
+					BidderAccount: bidderAccounts[loop2],
+					Alias:         "user" + fmt.Sprintf("%d", loop2),
+					Bid:           0,
+				}
+
+				bidBuf, err := protobuf.Encode(&bidata)
+				if err != nil {
+					return err
+				}
+
+				// Choose a random bit amount
+				bidamount = bidamount + uint64(loop2+1)
+				binary.LittleEndian.PutUint64(amount, uint64(bidamount))
+
+				fetch := byzcoin.Instruction{
+					InstanceID: bidderAccounts[loop2],
+					Invoke: &byzcoin.Invoke{
+						ContractID: contracts.ContractCoinID,
+						Command:    "fetch",
+						Args: byzcoin.Arguments{{
+							Name:  "coins",
+							Value: amount}},
+					},
+					SignerIdentities: []darc.Identity{signer.Identity()},
+					SignerCounter:    []uint64{ct},
+				}
+
+				bid := byzcoin.Instruction{
+					InstanceID: auctionID,
+					Invoke: &byzcoin.Invoke{
+						ContractID: auctions.ContractAuctionID,
+						Command:    "bid",
+						Args: byzcoin.Arguments{{
+							Name:  "bid",
+							Value: bidBuf}},
+					},
+					SignerIdentities: []darc.Identity{signer.Identity()},
+					SignerCounter:    []uint64{ct + 1},
+				}
+
+				instr = nil
+				instr = append(instr, fetch)
+				instr = append(instr, bid)
+				ct += 2
+
+				// sign instruction
+				tx = byzcoin.ClientTransaction{
+					Instructions: instr,
+				}
+				if err = tx.FillSignersAndSignWith(signer); err != nil {
+					return errors.New("signing of instruction failed: " + err.Error())
+				}
+				// Send the instructions.
+				_, err = c.AddTransactionAndWait(tx, 10)
+				if err != nil {
+					return errors.New("couldn't bid: " + err.Error())
+				}
+
+			}
+		}
 
 		// Close the auction. Send in that transaction with AddTxAndWait,
 		// and then check the final value of the highest bidder and that
@@ -229,10 +307,32 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 		confirm := monitor.NewTimeMeasure("confirm")
 
 		// tx := ...an auction close tx
-		// _, err = c.AddTransactionAndWait(tx, 20)
-		// if err != nil {
-		// 	return errors.New("while adding transaction and waiting: " + err.Error())
-		// }
+		close := byzcoin.Instruction{
+			InstanceID: auctionID,
+			Invoke: &byzcoin.Invoke{
+				ContractID: auctions.ContractAuctionID,
+				Command:    "close",
+			},
+			SignerIdentities: []darc.Identity{signer.Identity()},
+			SignerCounter:    []uint64{ct},
+		}
+
+		instr = nil
+		instr = append(instr, close)
+		ct += 1
+
+		// sign instruction
+		tx = byzcoin.ClientTransaction{
+			Instructions: instr,
+		}
+		if err = tx.FillSignersAndSignWith(signer); err != nil {
+			return errors.New("signing of instruction failed: " + err.Error())
+		}
+		// Send the instructions.
+		_, err = c.AddTransactionAndWait(tx, 20)
+		if err != nil {
+			return errors.New("couldn't close auction: " + err.Error())
+		}
 
 		proof, err := c.GetProof(sellerAccount.Slice())
 		if err != nil {
@@ -242,13 +342,15 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 		if err != nil {
 			return errors.New("proof doesn't hold transaction: " + err.Error())
 		}
+
 		var account byzcoin.Coin
 		err = protobuf.Decode(v0, &account)
 		if err != nil {
 			return errors.New("couldn't decode account: " + err.Error())
 		}
 		log.Lvlf1("Account has %d", account.Value)
-		if account.Value != uint64(1000) {
+		if account.Value != uint64(1000+s.Bidders*2) {
+			log.LLvl4("seller account at end", account.Value)
 			return errors.New("account has wrong amount")
 		}
 		confirm.Record()

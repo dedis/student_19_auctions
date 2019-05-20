@@ -207,6 +207,7 @@ func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID,
 func (bct *bcTest) addBid(t *testing.T, auctInstID byzcoin.InstanceID, bidAccInstID byzcoin.InstanceID, bid uint64) (BidData, error) {
 	bidata := BidData{
 		BidderAccount: bidAccInstID,
+		Alias:         "John",
 	}
 
 	bidBuf, err := protobuf.Encode(&bidata)
@@ -403,6 +404,7 @@ func printAuction(auction AuctionData) {
 	//fmt.Println("Reserve price: ", auction.ReservePrice)
 	//fmt.Println("State: ", auction.State.String())
 	fmt.Println("State: ", auction.State)
+	fmt.Println("Reserve price: ", auction.ReservePrice)
 	fmt.Println("Highest bidder: ", auction.HighestBidder, " with ", auction.HighestBid, "coins")
 }
 

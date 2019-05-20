@@ -14,15 +14,18 @@ import (
 // Auction struct
 
 type AuctionData struct {
-	GoodDescription string
-	SellerAccount   byzcoin.InstanceID
-	//ReservePrice    uint64
-	HighestBid    uint64
-	HighestBidder byzcoin.InstanceID
-	State         string
+	GoodDescription    string
+	SellerAccount      byzcoin.InstanceID
+	ReservePrice       []byte `protobuf:"opt"`
+	HighestBid         uint64
+	HighestBidder      byzcoin.InstanceID
+	HighestBidderAlias string
+	State              string
+	WinProof           []byte
 }
 
 type BidData struct {
 	BidderAccount byzcoin.InstanceID
+	Alias         string
 	Bid           uint64
 }
