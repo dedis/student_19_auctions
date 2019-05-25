@@ -1,8 +1,11 @@
 package auctions
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -185,6 +188,7 @@ func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID,
 		HighestBid:      0,
 		HighestBidder:   instID,
 		State:           "OPEN",
+		ReservePrice:    createHash("testsalt", 0),
 	}
 
 	auctionBuf, err := protobuf.Encode(&auction)
@@ -207,7 +211,6 @@ func (bct *bcTest) createAuction(t *testing.T, sellAccInstID byzcoin.InstanceID,
 func (bct *bcTest) addBid(t *testing.T, auctInstID byzcoin.InstanceID, bidAccInstID byzcoin.InstanceID, bid uint64) (BidData, error) {
 	bidata := BidData{
 		BidderAccount: bidAccInstID,
-		Alias:         "John",
 	}
 
 	bidBuf, err := protobuf.Encode(&bidata)
@@ -321,20 +324,32 @@ func (bct *bcTest) addBidWithDiffCoinName(t *testing.T, auctInstID byzcoin.Insta
 
 func (bct *bcTest) closeAuction(t *testing.T, auctInstID byzcoin.InstanceID) error {
 
-	// Try to invoke
+	closedata := CloseData{
+		Salt:         "testsalt",
+		ReservePrice: 0,
+	}
+
+	closeBuf, err := protobuf.Encode(&closedata)
+	if err != nil {
+		return err
+	}
+
 	ctx := byzcoin.ClientTransaction{
 		Instructions: []byzcoin.Instruction{{
 			InstanceID: auctInstID,
 			Invoke: &byzcoin.Invoke{
 				ContractID: ContractAuctionID,
 				Command:    "close",
+				Args: byzcoin.Arguments{{
+					Name:  "close",
+					Value: closeBuf}},
 			},
 			SignerCounter: []uint64{bct.ct},
 		}},
 	}
 
 	require.Nil(t, ctx.FillSignersAndSignWith(bct.signer))
-	_, err := bct.cl.AddTransactionAndWait(ctx, 10)
+	_, err = bct.cl.AddTransactionAndWait(ctx, 10)
 	if err == nil {
 		bct.ct += 1
 	}
@@ -408,13 +423,11 @@ func printAuction(auction AuctionData) {
 	fmt.Println("Highest bidder: ", auction.HighestBidder, " with ", auction.HighestBid, "coins")
 }
 
-//type state uint64
-//
-//var states = [...]string{
-//	"OPEN",
-//	"CLOSED",
-//}
-
-//func (s state) String() string {
-//	return states[s-1]
-//}
+func createHash(salt string, reservP uint64) string {
+	strReservePrice := strconv.Itoa(int(reservP))
+	h := sha256.New()
+	h.Write([]byte(salt + strReservePrice))
+	hashed := h.Sum(nil)
+	hash := hex.EncodeToString(hashed)
+	return hash
+}

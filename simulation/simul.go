@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -184,6 +187,7 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 			HighestBid:      0,
 			HighestBidder:   instID,
 			State:           "OPEN",
+			ReservePrice:    createHash("simulationsalt", 0),
 		}
 
 		auctionBuf, err := protobuf.Encode(&auction)
@@ -231,7 +235,7 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 		// and send in bids.
 
 		amount := make([]byte, 8)
-		bidamount := uint64(0)
+		bidamount := uint64(1)
 
 		for loop1 := 0; loop1 < s.Bids; loop1++ {
 
@@ -240,6 +244,7 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 				bidata := auctions.BidData{
 					BidderAccount: bidderAccounts[loop2],
 					Bid:           0,
+					BidderPubKey:  bidderAccounts[loop2].String(),
 				}
 
 				bidBuf, err := protobuf.Encode(&bidata)
@@ -247,9 +252,9 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 					return err
 				}
 
-				// Choose a random bit amount
-				bidamount = bidamount + uint64(loop2+1)
+				// log.LLvl4(bidamount)
 				binary.LittleEndian.PutUint64(amount, uint64(bidamount))
+				bidamount = bidamount + uint64(1)
 
 				fetch := byzcoin.Instruction{
 					InstanceID: bidderAccounts[loop2],
@@ -305,18 +310,31 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 		confirm := monitor.NewTimeMeasure("confirm")
 
 		// tx := ...an auction close tx
-		close := byzcoin.Instruction{
+		closedata := auctions.CloseData{
+			Salt:         "simulationsalt",
+			ReservePrice: 0,
+		}
+
+		closeBuf, err := protobuf.Encode(&closedata)
+		if err != nil {
+			return err
+		}
+
+		closing := byzcoin.Instruction{
 			InstanceID: auctionID,
 			Invoke: &byzcoin.Invoke{
 				ContractID: auctions.ContractAuctionID,
 				Command:    "close",
+				Args: byzcoin.Arguments{{
+					Name:  "close",
+					Value: closeBuf}},
 			},
 			SignerIdentities: []darc.Identity{signer.Identity()},
 			SignerCounter:    []uint64{ct},
 		}
 
 		instr = nil
-		instr = append(instr, close)
+		instr = append(instr, closing)
 		ct += 1
 
 		// sign instruction
@@ -347,7 +365,7 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 			return errors.New("couldn't decode account: " + err.Error())
 		}
 		log.Lvlf1("Account has %d", account.Value)
-		if account.Value != uint64(s.Bidders*2) {
+		if account.Value != uint64(s.Bidders*s.Bids*(round+1)) {
 			log.LLvl4("seller account at end", account.Value)
 			return errors.New("account has wrong amount")
 		}
@@ -370,4 +388,13 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 	time.Sleep(time.Second)
 
 	return nil
+}
+
+func createHash(salt string, reservP uint64) string {
+	strReservePrice := strconv.Itoa(int(reservP))
+	h := sha256.New()
+	h.Write([]byte(salt + strReservePrice))
+	hashed := h.Sum(nil)
+	hash := hex.EncodeToString(hashed)
+	return hash
 }

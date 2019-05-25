@@ -10,6 +10,12 @@ BlockInterval = "1s"
 # This section of the file lists test scenarios, one per line, with variables
 # to vary, separated by tabs.
 Bidders,    Bids
-20,     1
-#200,     5
+40,     1
+100,     2
+200,     5
+500,     10
+800,     15
+1000,     20
+2000,     30
+5000,     40
 
