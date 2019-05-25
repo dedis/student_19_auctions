@@ -205,53 +205,76 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 
 	case "close":
 
-		closeBuf := inst.Invoke.Args.Search("close")
-		if closeBuf == nil {
-			err = errors.New("need an argument with name close")
-			return
-		}
+		if auction.ReservePrice != "" {
 
-		//Verify
-		closedata := CloseData{}
-		err = protobuf.Decode(closeBuf, &closedata)
-		if err != nil {
-			err = errors.New("not a close struct")
-			return
-		}
+			closeBuf := inst.Invoke.Args.Search("close")
+			if closeBuf == nil {
+				err = errors.New("need an argument with name close")
+				return
+			}
 
-		salt := closedata.Salt
-		reservePrice := closedata.ReservePrice
+			//Verify
+			closedata := CloseData{}
+			err = protobuf.Decode(closeBuf, &closedata)
+			if err != nil {
+				err = errors.New("not a close struct")
+				return
+			}
+			salt := closedata.Salt
+			reservePrice := closedata.ReservePrice
 
-		strReservePrice := strconv.Itoa(int(reservePrice))
+			strReservePrice := strconv.Itoa(int(reservePrice))
 
-		h := sha256.New()
-		h.Write([]byte(salt + strReservePrice))
-		hashed := h.Sum(nil)
-		hash := hex.EncodeToString(hashed)
+			h := sha256.New()
+			h.Write([]byte(salt + strReservePrice))
+			hashed := h.Sum(nil)
+			hash := hex.EncodeToString(hashed)
 
-		if hash == auction.ReservePrice {
+			if hash == auction.ReservePrice {
 
-			if auction.HighestBid > 0 {
+				if auction.HighestBid > 0 {
 
-				if auction.HighestBid > reservePrice {
-					sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.SellerAccount)
-					if err != nil {
-						return
+					if auction.HighestBid > reservePrice {
+						sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.SellerAccount)
+						if err != nil {
+							return
+						}
+						auction.State = "WCLOSED"
+
+					} else {
+						//sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.HighestBidder)
+						//if err != nil {
+						//	return
+						//}
+						log.LLvl4("Asked closing but reserve price not met...")
 					}
 
 				} else {
-					sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.HighestBidder)
-					if err != nil {
-						return
-					}
-					log.LLvl4("Reserve price not met. No winner...")
+					log.LLvl4("Asked closing with no bids...")
 				}
 
-			} else {
-				log.LLvl4("Closing auction without any bids...")
-			}
+				auctionBuf, err = protobuf.Encode(&auction)
+				if err != nil {
+					return nil, nil, errors.New("encode auction buf sc: close")
+				}
 
-			auction.State = "CLOSED"
+				sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+					ContractAuctionID, auctionBuf, darcID))
+
+			} else {
+				return nil, nil, errors.New("Verification of reserve price failed")
+			}
+		} else {
+			if auction.HighestBid > 0 {
+				sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.SellerAccount)
+				if err != nil {
+					return
+				}
+				auction.State = "WCLOSED"
+
+			} else {
+				log.LLvl4("Asked closing with no bids...")
+			}
 
 			auctionBuf, err = protobuf.Encode(&auction)
 			if err != nil {
@@ -260,9 +283,6 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 
 			sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
 				ContractAuctionID, auctionBuf, darcID))
-
-		} else {
-			return nil, nil, errors.New("Verification of reserve price failed")
 		}
 
 	case "drop":
@@ -283,8 +303,27 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 		sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
 			ContractAuctionID, auctionBuf, darcID))
 
+	case "forceclose":
+
+		log.LLvl4("Force auction close...")
+		auction.State = "CLOSED"
+		if auction.HighestBid > 0 {
+			sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.HighestBidder)
+			if err != nil {
+				return
+			}
+		}
+
+		auctionBuf, err = protobuf.Encode(&auction)
+		if err != nil {
+			return nil, nil, errors.New("encode auction buf sc: drop")
+		}
+
+		sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+			ContractAuctionID, auctionBuf, darcID))
+
 	default:
-		err = errors.New("Auction contract can only bid close or drop")
+		err = errors.New("Auction contract can only bid close forceclose or drop")
 	}
 
 	return
