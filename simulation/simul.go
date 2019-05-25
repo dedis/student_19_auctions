@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -240,7 +239,6 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 
 				bidata := auctions.BidData{
 					BidderAccount: bidderAccounts[loop2],
-					Alias:         "user" + fmt.Sprintf("%d", loop2),
 					Bid:           0,
 				}
 
@@ -349,7 +347,7 @@ func (s *SimulationService) Run(config *onet.SimulationConfig) error {
 			return errors.New("couldn't decode account: " + err.Error())
 		}
 		log.Lvlf1("Account has %d", account.Value)
-		if account.Value != uint64(1000+s.Bidders*2) {
+		if account.Value != uint64(s.Bidders*2) {
 			log.LLvl4("seller account at end", account.Value)
 			return errors.New("account has wrong amount")
 		}

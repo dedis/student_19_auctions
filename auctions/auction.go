@@ -1,18 +1,15 @@
 package auctions
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"go.dedis.ch/cothority/v3/byzcoin"
 	"go.dedis.ch/cothority/v3/byzcoin/contracts"
 	"go.dedis.ch/cothority/v3/darc"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/protobuf"
-	"math/rand"
 	"strconv"
-	"strings"
-	"time"
 )
 
 // ContractAuctionID identifies an auction contract
@@ -178,7 +175,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 
 				auction.HighestBid = bid.Bid
 				auction.HighestBidder = bid.BidderAccount
-				auction.HighestBidderAlias = bid.Alias
+				auction.WinProof = bid.BidderPubKey
 				auctionBuf, err = protobuf.Encode(&auction)
 
 				sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
@@ -194,7 +191,7 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 				//Then update highest bid/bidder
 				auction.HighestBid = bid.Bid
 				auction.HighestBidder = bid.BidderAccount
-				auction.HighestBidderAlias = bid.Alias
+				auction.WinProof = bid.BidderPubKey
 				auctionBuf, err = protobuf.Encode(&auction)
 
 				sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
@@ -208,41 +205,65 @@ func (c *contractAuction) Invoke(rst byzcoin.ReadOnlyStateTrie, inst byzcoin.Ins
 
 	case "close":
 
-		if auction.HighestBid > 0 {
+		closeBuf := inst.Invoke.Args.Search("close")
+		if closeBuf == nil {
+			err = errors.New("need an argument with name close")
+			return
+		}
 
-			reservePrice := getReservePrice(auction.ReservePrice)
+		//Verify
+		closedata := CloseData{}
+		err = protobuf.Decode(closeBuf, &closedata)
+		if err != nil {
+			err = errors.New("not a close struct")
+			return
+		}
 
-			if auction.HighestBid > reservePrice {
-				sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.SellerAccount)
-				if err != nil {
-					return
+		salt := closedata.Salt
+		reservePrice := closedata.ReservePrice
+
+		strReservePrice := strconv.Itoa(int(reservePrice))
+
+		h := sha256.New()
+		h.Write([]byte(salt + strReservePrice))
+		hashed := h.Sum(nil)
+		hash := hex.EncodeToString(hashed)
+
+		if hash == auction.ReservePrice {
+
+			if auction.HighestBid > 0 {
+
+				if auction.HighestBid > reservePrice {
+					sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.SellerAccount)
+					if err != nil {
+						return
+					}
+
+				} else {
+					sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.HighestBidder)
+					if err != nil {
+						return
+					}
+					log.LLvl4("Reserve price not met. No winner...")
 				}
-				proof, erreur := GenerateWinProof()
-				if erreur != nil {
-					err = errors.New("Can not generate winning proof")
-					return
-				}
-				auction.WinProof = proof
 
 			} else {
-				sc, cout, err = c.storeCoin(rst, auction.HighestBid, auction.HighestBidder)
-				if err != nil {
-					return
-				}
-				log.LLvl4("Reserve price not met. No winner...")
-				auction.HighestBidderAlias = "Reserve price no met"
+				log.LLvl4("Closing auction without any bids...")
 			}
+
+			auction.State = "CLOSED"
+
+			auctionBuf, err = protobuf.Encode(&auction)
+			if err != nil {
+				return nil, nil, errors.New("encode auction buf sc: close")
+			}
+
+			sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
+				ContractAuctionID, auctionBuf, darcID))
+
+		} else {
+			return nil, nil, errors.New("Verification of reserve price failed")
 		}
-
-		auction.State = "CLOSED"
-
-		auctionBuf, err = protobuf.Encode(&auction)
-		if err != nil {
-			return nil, nil, errors.New("encode auction buf sc: close")
-		}
-
-		sc = append(sc, byzcoin.NewStateChange(byzcoin.Update, inst.InstanceID,
-			ContractAuctionID, auctionBuf, darcID))
 
 	case "drop":
 
@@ -308,58 +329,4 @@ func (c *contractAuction) storeCoin(rst byzcoin.ReadOnlyStateTrie, amount uint64
 	//log.LLvl4("c1 name", c1.Name)
 
 	return cCoin.Invoke(rst, instruct, []byzcoin.Coin{c1})
-}
-
-func allZero(s []byte) bool {
-	for _, v := range s {
-		if v != 0 {
-			return false
-		}
-	}
-	return true
-}
-
-// GenerateWinProof returns securely generated random bytes
-func GenerateWinProof() ([]byte, error) {
-	rand.Seed(time.Now().UnixNano())
-	b := make([]byte, 16)
-	_, err := rand.Read(b)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
-func getReservePrice(reservPrice []byte) uint64 {
-	test := allZero(reservPrice)
-	if test == true {
-		return 0
-	}
-
-	t := string(reservPrice[1])
-	rplen, _ := strconv.ParseInt(t, 16, 64)
-	fmt.Println(rplen)
-	var temp []string
-	var rpstr []string
-	var i = 0
-	var j = 3
-
-	for i < int(rplen*2) {
-		temp = append(temp, string(reservPrice[j]))
-		j = j + 2
-		i++
-	}
-
-	var tmp = strings.Join(temp, "")
-	i = 0
-	for i < int(rplen*2) {
-		k, _ := hex.DecodeString(tmp[i : i+2])
-		rpstr = append(rpstr, string(k))
-		i = i + 2
-	}
-
-	tmp = strings.Join(rpstr, "")
-	reservPInt, _ := strconv.Atoi(tmp)
-
-	return uint64(reservPInt)
 }
