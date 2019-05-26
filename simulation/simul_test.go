@@ -8,9 +8,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	log.MainTest(m, 0)
+	log.MainTest(m)
 }
 
 func TestSimulation(t *testing.T) {
-	simul.Start("auction.toml")
+	simul.Start("open_auction.toml", "centrilized_auction.toml")
 }

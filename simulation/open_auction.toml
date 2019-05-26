@@ -1,5 +1,5 @@
-Simulation = "Auction"
-Servers = 2
+Simulation = "OpenAuction"
+Servers = 50
 Hosts = 5
 Depth = 1
 Rounds = 2
@@ -10,12 +10,14 @@ BlockInterval = "1s"
 # This section of the file lists test scenarios, one per line, with variables
 # to vary, separated by tabs.
 Bidders,    Bids
-40,     1
-100,     2
-#200,     5
-#500,     10
-#800,     15
-#1000,     20
-#2000,     30
-#5000,     40
+10,     4
+50,     4
+#100,     4
+#200,     4
+#400,     4
+#800,     4
+#1600,     4
+#3200,     4
+#5000,     4
+#10000,     4
 

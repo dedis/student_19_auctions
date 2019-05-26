@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/stretchr/testify v1.3.0
 	go.dedis.ch/cothority/v3 v3.0.2
+	go.dedis.ch/kyber/v3 v3.0.2
 	go.dedis.ch/onet/v3 v3.0.5
 	go.dedis.ch/protobuf v1.0.6
 	golang.org/x/crypto v0.0.0-20190320223903-b7391e95e576 // indirect
