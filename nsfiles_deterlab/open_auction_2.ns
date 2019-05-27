@@ -10,7 +10,6 @@ set lanstr ""
 for {set i 0} {$i < $server_count} {incr i} {
     set server($i) [$ns node]
         tb-set-hardware $server($i) bpc2133
-        tb-set-node-os $server($i) Ubuntu1404-64-STD
         append server_lanstr "$server($i) "
 }
 
