@@ -1,13 +1,11 @@
 package main
 
 import (
-	"errors"
 	"github.com/BurntSushi/toml"
 	"github.com/dedis/student_19_auctions/centrilized_auctions"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/simul/monitor"
-	"strconv"
 )
 
 func init() {
@@ -65,28 +63,20 @@ func (s *SimulationCentAuction) Run(config *onet.SimulationConfig) error {
 	size := config.Tree.Size()
 	log.Lvl2("Size is:", size, "rounds:", s.Rounds)
 
-	c := template.NewClient()
+	c := centrilized_auctions.NewClient()
 
 	for round := 0; round < s.Rounds; round++ {
 		log.Lvl1("Starting round", round)
 		round := monitor.NewTimeMeasure("round")
-		p, err := config.Overlay.CreateProtocol(centrilized_auctions.ProtocolName, config.Tree, onet.NilServiceID)
-		if err != nil {
-			return err
-		}
 
 		for loop1 := 0; loop1 < s.Bids; loop1++ {
 			for loop2 := 0; loop2 < s.Bidders; loop2++ {
+				_, err := c.Bid(config.Roster)
+				log.ErrFatal(err)
 
+				round.Record()
 			}
 		}
-		go p.Start()
-		children := <-p.(*centrilized_auctions.CentAuctionProtocol).ChildCount
-		if children != size {
-			return errors.New("Didn't get " + strconv.Itoa(size) +
-				" children")
-		}
-		round.Record()
 	}
 	return nil
 }

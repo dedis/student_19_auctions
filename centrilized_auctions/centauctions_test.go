@@ -35,7 +35,9 @@ func TestClient_Close(t *testing.T) {
 
 	local := onet.NewTCPTest(tSuite)
 
-	_, roster, _ := local.GenTree(1, true)
+	nbr := 5
+
+	_, roster, _ := local.GenTree(nbr, true)
 	defer local.CloseAll()
 
 	c := NewClient()
@@ -47,21 +49,21 @@ func TestClient_Close(t *testing.T) {
 		require.Equal(t, 0, highestbid)
 	}
 
-	nbBidders := 5
-	// Make some clock-requests
+	nbBidders := 6
+	// Make some bid-requests
 	for i := 0; i < nbBidders; i++ {
 		_, err := c.Bid(roster)
 		require.Nil(t, err)
 	}
 
 	// Verify we have the correct total of bid
-	total := 0
+	highestbid := 0
 	for _, s := range roster.List {
-		highestbid, err := c.Close(s)
+		highb, err := c.Close(s)
 		require.Nil(t, err)
-		total += highestbid
+		highestbid = highb
 	}
-	require.Equal(t, nbBidders, total)
+	require.Equal(t, nbBidders, highestbid)
 }
 
 // Tests a 2, 5 and 13-node system. It is good practice to test different

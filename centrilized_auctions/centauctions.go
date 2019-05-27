@@ -19,7 +19,7 @@ func NewClient() *Client {
 }
 
 // Bid chooses one server from the Roster at random. It
-// sends a Clock to it, which is then processed on the server side
+// sends a bid to it, which is then processed on the server side
 // via the code in service.
 //
 // Bid will return the time in seconds it took to run the protocol.
