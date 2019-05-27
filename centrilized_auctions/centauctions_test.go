@@ -47,7 +47,7 @@ func TestClient_Close(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	// Verify we have the correct total of bid
+	// Verify we have the correct highest bid
 	highb, err := c.Close(roster.List[0])
 	require.Nil(t, err)
 	require.Equal(t, nbBidders, highb)

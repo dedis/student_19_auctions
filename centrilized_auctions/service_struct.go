@@ -28,7 +28,7 @@ type Bid struct {
 type BidReply struct {
 }
 
-// Close returns the number of protocol-runs = highest bid
+// Close returns the highest bid
 type Close struct {
 	Roster *onet.Roster
 }

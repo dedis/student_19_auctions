@@ -6,12 +6,9 @@ import (
 	"go.dedis.ch/onet/v3/log"
 )
 
-// Used for tests
-var centauctionID onet.ServiceID
-
 func init() {
 	var err error
-	centauctionID, err = onet.RegisterNewService(ServiceName, newService)
+	_, err = onet.RegisterNewService(ServiceName, newService)
 	log.ErrFatal(err)
 }
 
@@ -21,7 +18,6 @@ type Service struct {
 	HighestBid int
 }
 
-// Bid starts a bid-protocol.
 func (s *Service) Bid(r *Bid) (*BidReply, error) {
 	if s.HighestBid >= r.Bid {
 		return nil, errors.New("bid too low")
@@ -30,7 +26,7 @@ func (s *Service) Bid(r *Bid) (*BidReply, error) {
 	return &BidReply{}, nil
 }
 
-// Count returns the number of instantiations of the protocol = highest bid.
+// Count returns the highest bid.
 func (s *Service) Close(arg *Close) (*CloseReply, error) {
 	reply := &CloseReply{HighestBid: s.HighestBid}
 	s.HighestBid = 0
