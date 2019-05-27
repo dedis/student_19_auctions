@@ -11,7 +11,10 @@ func TestMain(m *testing.M) {
 	log.MainTest(m)
 }
 
-func TestSimulation(t *testing.T) {
-	//simul.Start("open_auction.toml", "centrilized_auction.toml")
+func Test_Open(t *testing.T) {
 	simul.Start("open_auction.toml")
+}
+
+func Test_Centralized(t *testing.T) {
+	simul.Start("centrilized_auction.toml")
 }

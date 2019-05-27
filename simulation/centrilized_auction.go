@@ -69,14 +69,22 @@ func (s *SimulationCentAuction) Run(config *onet.SimulationConfig) error {
 		log.Lvl1("Starting round", round)
 		round := monitor.NewTimeMeasure("round")
 
+		bid := 0
 		for loop1 := 0; loop1 < s.Bids; loop1++ {
 			for loop2 := 0; loop2 < s.Bidders; loop2++ {
-				_, err := c.Bid(config.Roster)
+				bid++
+				_, err := c.Bid(config.Roster, bid)
 				log.ErrFatal(err)
-
-				round.Record()
 			}
 		}
+
+		round.Record()
+
+		high, err := c.Close(config.Roster.List[0])
+		if high != bid {
+			log.Error("wrong high bid")
+		}
+		log.ErrFatal(err)
 	}
 	return nil
 }

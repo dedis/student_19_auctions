@@ -1,6 +1,6 @@
 Simulation = "CentrilizedAuction"
 Servers = 1
-Hosts = 50
+Hosts = 1
 Depth = 1
 Rounds = 2
 RunWait = "6000s"

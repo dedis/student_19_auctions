@@ -21,14 +21,11 @@ const (
 	ErrorParse = iota + 4000
 )
 
-// Bid will run the centauction-protocol on the roster
 type Bid struct {
-	Roster *onet.Roster
+	Bid int
 }
 
-// BidReply returns the number of children
 type BidReply struct {
-	Children int
 }
 
 // Close returns the number of protocol-runs = highest bid

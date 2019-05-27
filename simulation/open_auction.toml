@@ -1,6 +1,6 @@
 Simulation = "OpenAuction"
-Servers = 50
-Hosts = 5
+Servers = 2
+Hosts = 3
 Depth = 1
 Rounds = 2
 RunWait = "6000s"

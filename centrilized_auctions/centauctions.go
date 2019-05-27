@@ -23,11 +23,11 @@ func NewClient() *Client {
 // via the code in service.
 //
 // Bid will return the time in seconds it took to run the protocol.
-func (c *Client) Bid(r *onet.Roster) (*BidReply, error) {
+func (c *Client) Bid(r *onet.Roster, bid int) (*BidReply, error) {
 	dst := r.RandomServerIdentity()
 	log.Lvl4("Sending message to", dst)
 	reply := &BidReply{}
-	err := c.SendProtobuf(dst, &Bid{r}, reply)
+	err := c.SendProtobuf(dst, &Bid{bid}, reply)
 	if err != nil {
 		return nil, err
 	}
