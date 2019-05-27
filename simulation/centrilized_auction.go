@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	onet.SimulationRegister("CentrilizedAuction", NewSimulationService)
+	onet.SimulationRegister("CentrilizedAuction", NewSimulationCentAuction)
 }
 
 // SimulationService holds the state of the simulation.
@@ -22,7 +22,7 @@ type SimulationCentAuction struct {
 
 // NewSimulationService returns the new simulation, where all fields are
 // initialised using the config-file
-func NewSimulationService(config string) (onet.Simulation, error) {
+func NewSimulationCentAuction(config string) (onet.Simulation, error) {
 	es := &SimulationCentAuction{}
 	_, err := toml.Decode(config, es)
 	if err != nil {

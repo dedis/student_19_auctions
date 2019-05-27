@@ -20,7 +20,7 @@ import (
 )
 
 func init() {
-	onet.SimulationRegister("OpenAuction", NewSimulationService)
+	onet.SimulationRegister("OpenAuction", NewSimulationOpenAuction)
 }
 
 // SimulationService holds the state of the simulation.
