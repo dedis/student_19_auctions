@@ -27,6 +27,7 @@ func init() {
 type SimulationOpenAuction struct {
 	onet.SimulationBFTree
 	BlockInterval string
+	Auctions      int
 	Bidders       int
 	Bids          int
 }
@@ -94,14 +95,13 @@ func (s *SimulationOpenAuction) Run(config *onet.SimulationConfig) error {
 	}
 
 	// Create accounts for each bidder and give them 1000 coins to use.
-	// Create one extra account for the seller.
 	coins := make([]byte, 8)
 	binary.LittleEndian.PutUint64(coins, 100000)
 
 	var instr []byzcoin.Instruction
 
 	ct := uint64(1)
-	for i := 0; i < s.Bidders+1; i++ {
+	for i := 0; i < s.Bidders; i++ {
 		acct := byzcoin.Instruction{
 			InstanceID: byzcoin.NewInstanceID(gm.GenesisDarc.GetBaseID()),
 			Spawn: &byzcoin.Spawn{
@@ -128,12 +128,11 @@ func (s *SimulationOpenAuction) Run(config *onet.SimulationConfig) error {
 		return errors.New("couldn't initialize accounts: " + err.Error())
 	}
 
-	// Remember the bidder accounts and the seller account (the last one)
+	// Remember the bidder accounts
 	bidderAccounts := make([]byzcoin.InstanceID, s.Bidders)
 	for i := 0; i < s.Bidders; i++ {
 		bidderAccounts[i] = tx.Instructions[i].DeriveID("")
 	}
-	sellerAccount := tx.Instructions[s.Bidders].DeriveID("")
 
 	// Now put coins in all the bidder accounts.
 	instr = nil
@@ -166,93 +165,138 @@ func (s *SimulationOpenAuction) Run(config *onet.SimulationConfig) error {
 		return errors.New("couldn't initialize accounts: " + err.Error())
 	}
 
-	// For each round, open an auction, have the senders send bids, close the auction
-	// and confirm that the auction result was correct.
+	// Create accounts for each seller
+	instr = nil
 
-	for round := 0; round < s.Rounds; round++ {
-		log.Lvl1("Starting round", round)
-		roundM := monitor.NewTimeMeasure("round")
-
-		// Open auction
-		instID := byzcoin.InstanceID{}
-
-		auction := auctions.AuctionData{
-			GoodDescription: "bananas",
-			SellerAccount:   sellerAccount,
-			HighestBid:      0,
-			HighestBidder:   instID,
-			State:           "OPEN",
-			ReservePrice:    createHash("simulationsalt", 0),
+	for i := 0; i < s.Auctions; i++ {
+		acct := byzcoin.Instruction{
+			InstanceID: byzcoin.NewInstanceID(gm.GenesisDarc.GetBaseID()),
+			Spawn: &byzcoin.Spawn{
+				ContractID: contracts.ContractCoinID,
+			},
+			SignerIdentities: []darc.Identity{signer.Identity()},
+			SignerCounter:    []uint64{ct},
 		}
+		instr = append(instr, acct)
+		ct += 1
+	}
+
+	// Now sign all the instructions
+	tx = byzcoin.ClientTransaction{
+		Instructions: instr,
+	}
+
+	if err = tx.FillSignersAndSignWith(signer); err != nil {
+		return errors.New("signing of instruction failed: " + err.Error())
+	}
+	// Send the instructions.
+	_, err = c.AddTransactionAndWait(tx, 2)
+	if err != nil {
+		return errors.New("couldn't initialize accounts: " + err.Error())
+	}
+
+	// Remember the seller accounts
+	sellerAccounts := make([]byzcoin.InstanceID, s.Auctions)
+	for i := 0; i < s.Auctions; i++ {
+		sellerAccounts[i] = tx.Instructions[i].DeriveID("")
+		log.LLvl4(sellerAccounts[i])
+	}
+
+	// Create the auctions
+	instID := byzcoin.InstanceID{}
+
+	auction := auctions.AuctionData{
+		GoodDescription: "bananas",
+		HighestBid:      0,
+		HighestBidder:   instID,
+		State:           "OPEN",
+		ReservePrice:    createHash("simulationsalt", 0),
+	}
+
+	instr = nil
+
+	for i := 0; i < s.Auctions; i++ {
+
+		auction.SellerAccount = sellerAccounts[i]
 
 		auctionBuf, err := protobuf.Encode(&auction)
 		if err != nil {
 			return err
 		}
 
-		tx := byzcoin.ClientTransaction{
-			Instructions: []byzcoin.Instruction{
-				{
-					InstanceID: byzcoin.NewInstanceID(gm.GenesisDarc.GetBaseID()),
-					Spawn: &byzcoin.Spawn{
-						ContractID: auctions.ContractAuctionID,
-						Args: byzcoin.Arguments{
-							{
-								Name:  "auction",
-								Value: auctionBuf,
-							},
-						},
+		spauct := byzcoin.Instruction{
+			InstanceID: byzcoin.NewInstanceID(gm.GenesisDarc.GetBaseID()),
+			Spawn: &byzcoin.Spawn{
+				ContractID: auctions.ContractAuctionID,
+				Args: byzcoin.Arguments{
+					{
+						Name:  "auction",
+						Value: auctionBuf,
 					},
-					SignerIdentities: []darc.Identity{signer.Identity()},
-					SignerCounter:    []uint64{ct},
 				},
 			},
+			SignerIdentities: []darc.Identity{signer.Identity()},
+			SignerCounter:    []uint64{ct},
 		}
-		ct++
+		instr = append(instr, spauct)
+		ct += 1
+	}
 
-		if err = tx.FillSignersAndSignWith(signer); err != nil {
-			return errors.New("signing of instruction failed: " + err.Error())
-		}
+	// Now sign all the instructions
+	tx = byzcoin.ClientTransaction{
+		Instructions: instr,
+	}
 
-		log.Lvlf1("Spawn auction")
-		send := monitor.NewTimeMeasure("send")
-		_, err = c.AddTransaction(tx)
-		if err != nil {
-			return errors.New("couldn't add spawn auction transaction: " + err.Error())
-		}
+	if err = tx.FillSignersAndSignWith(signer); err != nil {
+		return errors.New("signing of instruction failed: " + err.Error())
+	}
+	// Send the instructions.
+	log.Lvlf1("Spawn auctions")
+	send := monitor.NewTimeMeasure("send")
+	_, err = c.AddTransactionAndWait(tx, 2)
+	if err != nil {
+		return errors.New("couldn't initialize accounts: " + err.Error())
+	}
 
-		// Get auction instance ID
-		auctionID := tx.Instructions[0].DeriveID("")
+	// Remember the auctions IDs
+	auctionIDs := make([]byzcoin.InstanceID, s.Auctions)
+	for i := 0; i < s.Auctions; i++ {
+		auctionIDs[i] = tx.Instructions[i].DeriveID("")
+	}
+	send.Record()
 
-		send.Record()
+	// For each auction, have the senders send bids, close the auction
+	// and confirm that the auction result was correct.
 
-		// Now write two loops from 0 to s.Bidders and from 0 to s.Bids
-		// and send in bids.
+	amount := make([]byte, 8)
+	bidamount := uint64(0)
 
-		amount := make([]byte, 8)
-		bidamount := uint64(1)
+	bidata := auctions.BidData{
+		Bid: 0,
+	}
 
-		for loop1 := 0; loop1 < s.Bids; loop1++ {
+	for round := 0; round < s.Bids; round++ {
+		log.Lvl1("Starting round", round)
+		roundM := monitor.NewTimeMeasure("round")
 
-			for loop2 := 0; loop2 < s.Bidders; loop2++ {
+		for loop1 := 0; loop1 < s.Bidders; loop1++ {
 
-				bidata := auctions.BidData{
-					BidderAccount: bidderAccounts[loop2],
-					Bid:           0,
-					BidderPubKey:  bidderAccounts[loop2].String(),
-				}
+			instr = nil
+			bidamount = bidamount + uint64(1)
+			binary.LittleEndian.PutUint64(amount, uint64(bidamount))
+
+			for loop2 := 0; loop2 < s.Auctions; loop2++ {
+
+				bidata.BidderAccount = bidderAccounts[loop1]
+				bidata.BidderPubKey = bidderAccounts[loop1].String()
 
 				bidBuf, err := protobuf.Encode(&bidata)
 				if err != nil {
 					return err
 				}
 
-				// log.LLvl4(bidamount)
-				binary.LittleEndian.PutUint64(amount, uint64(bidamount))
-				bidamount = bidamount + uint64(1)
-
 				fetch := byzcoin.Instruction{
-					InstanceID: bidderAccounts[loop2],
+					InstanceID: bidderAccounts[loop1],
 					Invoke: &byzcoin.Invoke{
 						ContractID: contracts.ContractCoinID,
 						Command:    "fetch",
@@ -265,7 +309,7 @@ func (s *SimulationOpenAuction) Run(config *onet.SimulationConfig) error {
 				}
 
 				bid := byzcoin.Instruction{
-					InstanceID: auctionID,
+					InstanceID: auctionIDs[loop2],
 					Invoke: &byzcoin.Invoke{
 						ContractID: auctions.ContractAuctionID,
 						Command:    "bid",
@@ -298,25 +342,37 @@ func (s *SimulationOpenAuction) Run(config *onet.SimulationConfig) error {
 			}
 		}
 
-		// Close the auction. Send in that transaction with AddTxAndWait,
-		// and then check the final value of the highest bidder and that
-		// the coins have been transfered into the sellerAccount.
+		roundM.Record()
 
-		confirm := monitor.NewTimeMeasure("confirm")
+		// This sleep is needed to wait for the propagation to finish
+		// on all the nodes. Otherwise the simulation manager
+		// (runsimul.go in onet) might close some nodes and cause
+		// skipblock propagation to fail.
+		time.Sleep(blockInterval)
+	}
 
-		// tx := ...an auction close tx
-		closedata := auctions.CloseData{
-			Salt:         "simulationsalt",
-			ReservePrice: 0,
-		}
+	// Close the auctions. Send in that transaction with AddTxAndWait,
+	// and then check the final value of the highest bidder and that
+	// the coins have been transfered into the sellerAccount.
 
-		closeBuf, err := protobuf.Encode(&closedata)
-		if err != nil {
-			return err
-		}
+	confirm := monitor.NewTimeMeasure("confirm")
 
+	// tx := ...an auction close tx
+	closedata := auctions.CloseData{
+		Salt:         "simulationsalt",
+		ReservePrice: 0,
+	}
+
+	closeBuf, err := protobuf.Encode(&closedata)
+	if err != nil {
+		return err
+	}
+
+	instr = nil
+
+	for loop2 := 0; loop2 < s.Auctions; loop2++ {
 		closing := byzcoin.Instruction{
-			InstanceID: auctionID,
+			InstanceID: auctionIDs[loop2],
 			Invoke: &byzcoin.Invoke{
 				ContractID: auctions.ContractAuctionID,
 				Command:    "close",
@@ -328,24 +384,28 @@ func (s *SimulationOpenAuction) Run(config *onet.SimulationConfig) error {
 			SignerCounter:    []uint64{ct},
 		}
 
-		instr = nil
 		instr = append(instr, closing)
 		ct += 1
 
-		// sign instruction
-		tx = byzcoin.ClientTransaction{
-			Instructions: instr,
-		}
-		if err = tx.FillSignersAndSignWith(signer); err != nil {
-			return errors.New("signing of instruction failed: " + err.Error())
-		}
-		// Send the instructions.
-		_, err = c.AddTransactionAndWait(tx, 20)
-		if err != nil {
-			return errors.New("couldn't close auction: " + err.Error())
-		}
+	}
 
-		proof, err := c.GetProof(sellerAccount.Slice())
+	// sign instruction
+	tx = byzcoin.ClientTransaction{
+		Instructions: instr,
+	}
+	if err = tx.FillSignersAndSignWith(signer); err != nil {
+		return errors.New("signing of instruction failed: " + err.Error())
+	}
+	// Send the instructions.
+	_, err = c.AddTransactionAndWait(tx, 20)
+	if err != nil {
+		return errors.New("couldn't close auction: " + err.Error())
+	}
+
+	var account byzcoin.Coin
+	for loop2 := 0; loop2 < s.Auctions; loop2++ {
+
+		proof, err := c.GetProof(sellerAccounts[loop2].Slice())
 		if err != nil {
 			return errors.New("couldn't get proof for transaction: " + err.Error())
 		}
@@ -354,33 +414,25 @@ func (s *SimulationOpenAuction) Run(config *onet.SimulationConfig) error {
 			return errors.New("proof doesn't hold transaction: " + err.Error())
 		}
 
-		var account byzcoin.Coin
 		err = protobuf.Decode(v0, &account)
 		if err != nil {
 			return errors.New("couldn't decode account: " + err.Error())
 		}
+
 		log.Lvlf1("Account has %d", account.Value)
-		if account.Value != uint64(s.Bidders*s.Bids*(round+1)) {
+		if account.Value != uint64(s.Bidders*s.Bids) {
 			log.LLvl4("seller account at end", account.Value)
 			return errors.New("account has wrong amount")
 		}
-		confirm.Record()
-
-		roundM.Record()
-
-		// This sleep is needed to wait for the propagation to finish
-		// on all the nodes. Otherwise the simulation manager
-		// (runsimul.go in onet) might close some nodes and cause
-		// skipblock propagation to fail.
-		time.Sleep(blockInterval)
 	}
 
-	// We wait a bit before closing because c.GetProof is sent to the
-	// leader, but at this point some of the children might still be doing
-	// updateCollection. If we stop the simulation immediately, then the
-	// database gets closed and updateCollection on the children fails to
-	// complete.
-	time.Sleep(time.Second)
+	confirm.Record()
+
+	// This sleep is needed to wait for the propagation to finish
+	// on all the nodes. Otherwise the simulation manager
+	// (runsimul.go in onet) might close some nodes and cause
+	// skipblock propagation to fail.
+	time.Sleep(blockInterval)
 
 	return nil
 }

@@ -4,7 +4,7 @@ import os
 
 data_dir = './test_data/'
 files = [(data_dir + fname) for fname in os.listdir(data_dir)\
-         if fname.startswith('coins') and fname.endswith('.csv')]
+         if fname.startswith('open') and fname.endswith('.csv')]
 
 def read_all_files(files):
     df = pd.DataFrame()
