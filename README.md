@@ -9,7 +9,7 @@ Step-by-step Guide for Installation
 
   go get https://github.com/dedis/student_19_auctions
 
-  cd ./... (student_19_auctions directory)
+  cd ./student_19_auctions
 
   go build
 
