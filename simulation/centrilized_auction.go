@@ -16,6 +16,7 @@ func init() {
 type SimulationCentAuction struct {
 	onet.SimulationBFTree
 	BlockInterval string
+	Auctions      int
 	Bidders       int
 	Bids          int
 }
@@ -64,14 +65,14 @@ func (s *SimulationCentAuction) Run(config *onet.SimulationConfig) error {
 	log.Lvl2("Size is:", size, "rounds:", s.Rounds)
 
 	c := centrilized_auctions.NewClient()
+	bid := 0
 
-	for round := 0; round < s.Rounds; round++ {
+	for round := 0; round < s.Bids; round++ {
 		log.Lvl1("Starting round", round)
 		round := monitor.NewTimeMeasure("round")
 
-		bid := 0
-		for loop1 := 0; loop1 < s.Bids; loop1++ {
-			for loop2 := 0; loop2 < s.Bidders; loop2++ {
+		for loop1 := 0; loop1 < s.Bidders; loop1++ {
+			for loop2 := 0; loop2 < s.Auctions; loop2++ {
 				bid++
 				_, err := c.Bid(config.Roster, bid)
 				log.ErrFatal(err)
@@ -79,12 +80,13 @@ func (s *SimulationCentAuction) Run(config *onet.SimulationConfig) error {
 		}
 
 		round.Record()
-
-		high, err := c.Close(config.Roster.List[0])
-		if high != bid {
-			log.Error("wrong high bid")
-		}
-		log.ErrFatal(err)
 	}
+
+	high, err := c.Close(config.Roster.List[0])
+	if high != bid {
+		log.Error("wrong high bid")
+	}
+	log.ErrFatal(err)
+
 	return nil
 }

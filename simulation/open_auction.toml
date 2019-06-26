@@ -1,23 +1,26 @@
 Simulation = "OpenAuction"
-Servers = 2
-Hosts = 3
+Servers = 7
+Hosts = 7
 Depth = 1
-Rounds = 1
+Rounds = 5
 RunWait = "6000s"
 Suite = "Ed25519"
 BlockInterval = "1s"
 
 # This section of the file lists test scenarios, one per line, with variables
 # to vary, separated by tabs.
-Auctions,   Bidders,    Bids
-2,  5,     2
-#50,     4
-#100,     4
-#200,     4
-#400,     4
-#800,     4
-#1600,     4
-#3200,     4
-#5000,     4
-#10000,     4
+
+Wait, Auctions, Bids
+#20,   10, 10
+#20,   20, 20
+#20,   50, 50
+#20,   100, 100
+#20,   150, 150
+20,   180, 180
+#20,   200, 200
+20,   250, 250
+#20,   300, 300
+
+
+
 

@@ -2,16 +2,15 @@ Simulation = "CentrilizedAuction"
 Servers = 1
 Hosts = 1
 Depth = 1
-Rounds = 2
 RunWait = "6000s"
 Suite = "Ed25519"
 BlockInterval = "1s"
 
 # This section of the file lists test scenarios, one per line, with variables
 # to vary, separated by tabs.
-Bidders,    Bids
-10,     4
-50,     4
+Auctions,   Bidders,    Bids
+2,  10,     4
+#50,     4
 #100,     4
 #200,     4
 #400,     4
