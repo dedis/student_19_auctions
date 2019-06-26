@@ -3,7 +3,7 @@ Auctions in ByzCoin by Diana Harena
 
 Step-by-step Guide for Installation
 
-1. Download and install the Golang
+1. Download and install Golang
 
 2. Run the following commands in terminal to download the project and required dependencies:
 
